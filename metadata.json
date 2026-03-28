@@ -1,0 +1,5 @@
+{
+  "name": "Premium Restaurant Ordering",
+  "description": "A modern, premium restaurant and cafe ordering system with QR-based table ordering, real-time kitchen coordination, and a powerful admin dashboard.",
+  "requestFramePermissions": []
+}

@@ -1,0 +1,131 @@
+{
+  "entities": {
+    "restaurant": {
+      "title": "Restaurant Profile",
+      "description": "Branding and configuration for the restaurant",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "logoUrl": { "type": "string" },
+        "contact": { "type": "string" },
+        "address": { "type": "string" },
+        "intro": { "type": "string" },
+        "theme": {
+          "type": "object",
+          "properties": {
+            "primaryColor": { "type": "string" },
+            "secondaryColor": { "type": "string" },
+            "accentColor": { "type": "string" }
+          }
+        }
+      },
+      "required": ["name"]
+    },
+    "menuItem": {
+      "title": "Menu Item",
+      "description": "A dish or beverage on the menu",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "description": { "type": "string" },
+        "price": { "type": "number" },
+        "categoryId": { "type": "string" },
+        "imageUrl": { "type": "string" },
+        "isBestSeller": { "type": "boolean" },
+        "isTodayPick": { "type": "boolean" },
+        "isSpecialOffer": { "type": "boolean" },
+        "isVeg": { "type": "boolean" },
+        "available": { "type": "boolean" }
+      },
+      "required": ["name", "price", "categoryId"]
+    },
+    "category": {
+      "title": "Menu Category",
+      "description": "Grouping for menu items",
+      "type": "object",
+      "properties": {
+        "name": { "type": "string" },
+        "order": { "type": "integer" }
+      },
+      "required": ["name"]
+    },
+    "table": {
+      "title": "Restaurant Table",
+      "description": "Physical table in the restaurant",
+      "type": "object",
+      "properties": {
+        "number": { "type": "integer" },
+        "qrCodeUrl": { "type": "string" }
+      },
+      "required": ["number"]
+    },
+    "order": {
+      "title": "Customer Order",
+      "description": "An order placed by a customer from a table",
+      "type": "object",
+      "properties": {
+        "customerName": { "type": "string" },
+        "tableNumber": { "type": "integer" },
+        "items": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": { "type": "string" },
+              "name": { "type": "string" },
+              "price": { "type": "number" },
+              "quantity": { "type": "integer" }
+            }
+          }
+        },
+        "notes": { "type": "string" },
+        "status": {
+          "type": "string",
+          "enum": ["pending", "preparing", "completed", "cancelled"]
+        },
+        "total": { "type": "number" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["customerName", "tableNumber", "items", "status", "total", "createdAt"]
+    },
+    "user": {
+      "title": "Staff User",
+      "description": "Admin or kitchen staff with dashboard access",
+      "type": "object",
+      "properties": {
+        "email": { "type": "string" },
+        "role": {
+          "type": "string",
+          "enum": ["admin", "kitchen"]
+        }
+      },
+      "required": ["email", "role"]
+    }
+  },
+  "firestore": {
+    "/settings/restaurant": {
+      "schema": "restaurant",
+      "description": "Global restaurant profile"
+    },
+    "/categories/{categoryId}": {
+      "schema": "category",
+      "description": "Menu categories"
+    },
+    "/menuItems/{itemId}": {
+      "schema": "menuItem",
+      "description": "Individual menu items"
+    },
+    "/tables/{tableId}": {
+      "schema": "table",
+      "description": "Restaurant tables"
+    },
+    "/orders/{orderId}": {
+      "schema": "order",
+      "description": "Customer orders"
+    },
+    "/users/{userId}": {
+      "schema": "user",
+      "description": "Staff roles"
+    }
+  }
+}
