@@ -136,12 +136,20 @@ export default function CustomerMenu({ restaurant }: Props) {
           <p className="text-stone-500 mb-10 text-lg font-medium">
             Your order has been sent to the kitchen. We'll serve you shortly.
           </p>
-          <button
-            onClick={() => setOrderSuccess(false)}
-            className="w-full premium-button bg-stone-800 text-white py-4 shadow-xl hover:bg-stone-700"
-          >
-            Order More
-          </button>
+          <div className="space-y-4">
+            <button
+              onClick={() => navigate(`/table/${tableId}`)}
+              className="w-full premium-button bg-primary text-white py-4 shadow-xl hover:bg-primary/90"
+            >
+              Track Order Status
+            </button>
+            <button
+              onClick={() => setOrderSuccess(false)}
+              className="w-full premium-button bg-stone-200 text-stone-800 py-4 shadow-sm hover:bg-stone-300"
+            >
+              Order More Items
+            </button>
+          </div>
         </motion.div>
       </div>
     );

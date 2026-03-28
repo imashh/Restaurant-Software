@@ -83,7 +83,7 @@ service cloud.firestore {
 
     // Orders
     match /orders/{orderId} {
-      allow read: if isKitchen();
+      allow read: if true;
       allow create: if request.resource.data.status == 'pending' &&
                       isValidString('customerName', 1, 50) &&
                       request.resource.data.items is list &&

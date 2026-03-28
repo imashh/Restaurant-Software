@@ -1,7 +1,10 @@
+import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { RestaurantProfile } from '../types';
+import { RestaurantProfile, Order } from '../types';
 import { motion } from 'framer-motion';
-import { MapPin, Phone, ArrowRight, UtensilsCrossed } from 'lucide-react';
+import { MapPin, Phone, ArrowRight, UtensilsCrossed, Clock, ChefHat, Receipt, Plus } from 'lucide-react';
+import { db } from '../lib/firebase';
+import { collection, query, where, onSnapshot } from 'firebase/firestore';
 
 interface Props {
   restaurant: RestaurantProfile | null;
@@ -10,11 +13,111 @@ interface Props {
 export default function Landing({ restaurant }: Props) {
   const { tableId } = useParams();
   const navigate = useNavigate();
+  const [activeOrders, setActiveOrders] = useState<Order[]>([]);
+  const [loading, setLoading] = useState(true);
 
-  if (!restaurant) {
+  useEffect(() => {
+    if (!tableId) return;
+    
+    const q = query(
+      collection(db, 'orders'),
+      where('tableNumber', '==', parseInt(tableId)),
+      where('status', 'in', ['pending', 'preparing'])
+    );
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const orders = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Order));
+      orders.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      setActiveOrders(orders);
+      setLoading(false);
+    });
+
+    return () => unsubscribe();
+  }, [tableId]);
+
+  if (!restaurant || loading) {
     return (
       <div className="h-screen flex items-center justify-center bg-stone-50">
         <div className="animate-pulse text-stone-400 font-serif italic text-xl">Welcome...</div>
+      </div>
+    );
+  }
+
+  if (activeOrders.length > 0) {
+    return (
+      <div className="min-h-screen bg-stone-50 p-6 pb-24">
+        <header className="mb-8 text-center pt-8">
+          <h1 className="text-3xl font-serif italic text-stone-900 mb-2">Your Orders</h1>
+          <p className="text-stone-500 text-sm uppercase tracking-widest font-bold">Table {tableId}</p>
+        </header>
+
+        <div className="space-y-6 max-w-md mx-auto">
+          {activeOrders.map(order => (
+            <motion.div 
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              key={order.id} 
+              className="bg-white rounded-3xl p-6 shadow-sm border border-stone-100"
+            >
+              <div className="flex items-center justify-between mb-6 pb-6 border-b border-stone-50">
+                <div>
+                  <p className="text-xs text-stone-400 uppercase tracking-widest font-bold mb-1">Order #{order.id.slice(-6)}</p>
+                  <p className="font-bold text-stone-800">{order.customerName}</p>
+                </div>
+                <div className="text-right">
+                  <p className="text-xs text-stone-400 uppercase tracking-widest font-bold mb-1">Total</p>
+                  <p className="font-bold text-primary">Rs. {order.total.toFixed(2)}</p>
+                </div>
+              </div>
+
+              {/* Status Tracker */}
+              <div className="mb-8">
+                <div className="flex justify-between mb-2">
+                  <div className={`flex flex-col items-center gap-2 ${order.status === 'pending' || order.status === 'preparing' ? 'text-primary' : 'text-stone-300'}`}>
+                    <div className={`w-10 h-10 rounded-full flex items-center justify-center ${order.status === 'pending' || order.status === 'preparing' ? 'bg-primary/10' : 'bg-stone-100'}`}>
+                      <Clock className="w-5 h-5" />
+                    </div>
+                    <span className="text-[10px] font-bold uppercase tracking-widest">Received</span>
+                  </div>
+                  <div className={`flex flex-col items-center gap-2 ${order.status === 'preparing' ? 'text-amber-500' : 'text-stone-300'}`}>
+                    <div className={`w-10 h-10 rounded-full flex items-center justify-center ${order.status === 'preparing' ? 'bg-amber-50' : 'bg-stone-100'}`}>
+                      <ChefHat className="w-5 h-5" />
+                    </div>
+                    <span className="text-[10px] font-bold uppercase tracking-widest">Preparing</span>
+                  </div>
+                </div>
+                <div className="relative h-2 bg-stone-100 rounded-full overflow-hidden">
+                  <motion.div 
+                    className={`absolute top-0 left-0 h-full ${order.status === 'preparing' ? 'bg-amber-500' : 'bg-primary'}`}
+                    initial={{ width: '0%' }}
+                    animate={{ width: order.status === 'preparing' ? '100%' : '50%' }}
+                    transition={{ duration: 0.5 }}
+                  />
+                </div>
+              </div>
+
+              {/* Items */}
+              <div className="space-y-3">
+                <h4 className="text-xs text-stone-400 uppercase tracking-widest font-bold flex items-center gap-2">
+                  <Receipt className="w-4 h-4" /> Order Items
+                </h4>
+                {order.items.map((item, idx) => (
+                  <div key={idx} className="flex justify-between text-sm">
+                    <span className="text-stone-600"><span className="font-bold mr-2">{item.quantity}x</span> {item.name}</span>
+                    <span className="text-stone-400">Rs. {(item.price * item.quantity).toFixed(2)}</span>
+                  </div>
+                ))}
+              </div>
+            </motion.div>
+          ))}
+
+          <button
+            onClick={() => navigate(`/table/${tableId}/menu`)}
+            className="w-full premium-button bg-stone-900 text-white py-4 flex items-center justify-center gap-2 shadow-xl hover:bg-stone-800"
+          >
+            <Plus className="w-5 h-5" /> Order More Items
+          </button>
+        </div>
       </div>
     );
   }
