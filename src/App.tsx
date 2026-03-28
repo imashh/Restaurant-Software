@@ -28,7 +28,7 @@ export default function App() {
           setRole(userDoc.data().role);
         } else if (currentUser.email === 'grafiqo.np@gmail.com') {
           setRole('admin');
-        } else if (currentUser.email === 'v..divash@gmail.com') {
+        } else if (currentUser.email === 'v.divash@gmail.com') {
           setRole('kitchen');
         }
       } else {

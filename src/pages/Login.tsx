@@ -28,14 +28,14 @@ export default function Login({ user, role }: Props) {
       const result = await signInWithPopup(auth, provider);
       const userDoc = await getDoc(doc(db, 'users', result.user.uid));
       
-      const allowedEmails = ['grafiqo.np@gmail.com', 'v..divash@gmail.com'];
+      const allowedEmails = ['grafiqo.np@gmail.com', 'v.divash@gmail.com'];
       
       if (!userDoc.exists() && !allowedEmails.includes(result.user.email || '')) {
         setError('Access denied. Please contact the administrator.');
         await auth.signOut();
       } else {
         let role = userDoc.exists() ? userDoc.data().role : 'admin';
-        if (!userDoc.exists() && result.user.email === 'v..divash@gmail.com') {
+        if (!userDoc.exists() && result.user.email === 'v.divash@gmail.com') {
           role = 'kitchen';
         }
         navigate(role === 'admin' ? '/admin' : '/kitchen');
