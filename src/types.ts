@@ -11,6 +11,8 @@ export interface RestaurantProfile {
   address?: string;
   intro?: string;
   theme?: RestaurantTheme;
+  paymentQrUrl?: string;
+  paymentDetails?: string;
 }
 
 export interface Category {
@@ -46,7 +48,7 @@ export interface OrderItem {
   quantity: number;
 }
 
-export type OrderStatus = 'pending' | 'preparing' | 'completed' | 'cancelled';
+export type OrderStatus = 'pending' | 'preparing' | 'payment_pending' | 'completed' | 'cancelled';
 
 export interface Order {
   id: string;

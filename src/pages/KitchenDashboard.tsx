@@ -163,17 +163,25 @@ export default function KitchenDashboard() {
                   </div>
 
                   {/* Actions */}
-                  <div className="p-6 pt-0 mt-auto">
+                  <div className="p-6 pt-0 mt-auto flex flex-col gap-2">
                     {order.status === 'pending' ? (
-                      <button
-                        onClick={() => updateStatus(order.id, 'preparing')}
-                        className="w-full bg-primary text-white py-4 rounded-2xl font-bold text-sm uppercase tracking-widest hover:bg-primary/90 transition-all flex items-center justify-center gap-2 shadow-lg shadow-primary/20"
-                      >
-                        Accept Order <ChevronRight className="w-4 h-4" />
-                      </button>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => updateStatus(order.id, 'cancelled')}
+                          className="flex-1 bg-red-500/10 text-red-500 py-4 rounded-2xl font-bold text-sm uppercase tracking-widest hover:bg-red-500/20 transition-all flex items-center justify-center"
+                        >
+                          Reject
+                        </button>
+                        <button
+                          onClick={() => updateStatus(order.id, 'preparing')}
+                          className="flex-[2] bg-primary text-white py-4 rounded-2xl font-bold text-sm uppercase tracking-widest hover:bg-primary/90 transition-all flex items-center justify-center gap-2 shadow-lg shadow-primary/20"
+                        >
+                          Accept <ChevronRight className="w-4 h-4" />
+                        </button>
+                      </div>
                     ) : (
                       <button
-                        onClick={() => updateStatus(order.id, 'completed')}
+                        onClick={() => updateStatus(order.id, 'payment_pending')}
                         className="w-full bg-green-600 text-white py-4 rounded-2xl font-bold text-sm uppercase tracking-widest hover:bg-green-500 transition-all flex items-center justify-center gap-2 shadow-lg shadow-green-900/20"
                       >
                         Mark Completed <CheckCircle2 className="w-4 h-4" />

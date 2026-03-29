@@ -9,7 +9,8 @@ import {
   deleteDoc, 
   updateDoc, 
   query, 
-  orderBy 
+  orderBy,
+  getDocs
 } from 'firebase/firestore';
 import { 
   RestaurantProfile, 
@@ -35,13 +36,17 @@ import {
   Palette,
   QrCode,
   ChevronRight,
-  Search
+  Search,
+  Banknote,
+  TrendingUp,
+  AlertTriangle
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { QRCodeSVG } from 'qrcode.react';
-import { format } from 'date-fns';
+import { format, startOfDay, startOfWeek, startOfMonth, isAfter } from 'date-fns';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -195,7 +200,52 @@ function SidebarItem({ icon, label, active, onClick }: { icon: any, label: strin
 
 function Overview({ orders }: { orders: Order[] }) {
   const activeOrders = orders.filter(o => o.status !== 'completed' && o.status !== 'cancelled');
-  const completedToday = orders.filter(o => o.status === 'completed').length;
+  const completedOrders = orders.filter(o => o.status === 'completed');
+  
+  const today = startOfDay(new Date());
+  const thisWeek = startOfWeek(new Date());
+  const thisMonth = startOfMonth(new Date());
+
+  const completedToday = completedOrders.filter(o => isAfter(new Date(o.createdAt), today));
+  const completedThisWeek = completedOrders.filter(o => isAfter(new Date(o.createdAt), thisWeek));
+  const completedThisMonth = completedOrders.filter(o => isAfter(new Date(o.createdAt), thisMonth));
+
+  const revenueToday = completedToday.reduce((sum, o) => sum + o.total, 0);
+  const revenueThisWeek = completedThisWeek.reduce((sum, o) => sum + o.total, 0);
+  const revenueThisMonth = completedThisMonth.reduce((sum, o) => sum + o.total, 0);
+
+  // Calculate average daily sales based on the first order date
+  const firstOrderDate = completedOrders.length > 0 
+    ? new Date(Math.min(...completedOrders.map(o => new Date(o.createdAt).getTime()))) 
+    : new Date();
+  const daysSinceFirstOrder = Math.max(1, Math.ceil((new Date().getTime() - firstOrderDate.getTime()) / (1000 * 3600 * 24)));
+  const totalRevenue = completedOrders.reduce((sum, o) => sum + o.total, 0);
+  const averageDailySales = totalRevenue / daysSinceFirstOrder;
+
+  const pendingPaymentOrders = orders.filter(o => o.status === 'payment_pending');
+
+  // Calculate most sold items
+  const itemCounts: Record<string, number> = {};
+  completedOrders.forEach(order => {
+    order.items.forEach(item => {
+      itemCounts[item.name] = (itemCounts[item.name] || 0) + item.quantity;
+    });
+  });
+
+  const sortedItems = Object.entries(itemCounts)
+    .sort(([, a], [, b]) => b - a)
+    .slice(0, 5)
+    .map(([name, count]) => ({ name, count }));
+
+  const mostSoldItem = sortedItems.length > 0 ? sortedItems[0].name : 'N/A';
+
+  const handlePaymentReceived = async (orderId: string) => {
+    try {
+      await updateDoc(doc(db, 'orders', orderId), { status: 'completed' });
+    } catch (e) {
+      handleFirestoreError(e, OperationType.UPDATE, `orders/${orderId}`);
+    }
+  };
 
   return (
     <motion.div 
@@ -203,10 +253,68 @@ function Overview({ orders }: { orders: Order[] }) {
       animate={{ opacity: 1, y: 0 }}
       className="space-y-8"
     >
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <StatCard label="Active Orders" value={activeOrders.length} icon={<Clock className="text-amber-500" />} />
-        <StatCard label="Completed Today" value={completedToday} icon={<CheckCircle2 className="text-green-500" />} />
-        <StatCard label="Total Revenue" value={`Rs. ${orders.reduce((a, b) => a + b.total, 0).toFixed(2)}`} icon={<Palette className="text-primary" />} />
+        <StatCard label="Pending Payment" value={pendingPaymentOrders.length} icon={<AlertTriangle className="text-orange-500" />} />
+        <StatCard label="Completed Today" value={completedToday.length} icon={<CheckCircle2 className="text-green-500" />} />
+        <StatCard label="Most Sold Item" value={mostSoldItem} icon={<Utensils className="text-blue-500" />} />
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <StatCard label="Daily Revenue" value={`Rs. ${revenueToday.toFixed(2)}`} icon={<Banknote className="text-primary" />} />
+        <StatCard label="Weekly Revenue" value={`Rs. ${revenueThisWeek.toFixed(2)}`} icon={<TrendingUp className="text-primary" />} />
+        <StatCard label="Monthly Revenue" value={`Rs. ${revenueThisMonth.toFixed(2)}`} icon={<Palette className="text-primary" />} />
+        <StatCard label="Avg Daily Sales" value={`Rs. ${averageDailySales.toFixed(2)}`} icon={<TrendingUp className="text-blue-500" />} />
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div className="lg:col-span-2 premium-card p-8">
+          <h3 className="text-xl font-serif italic text-stone-800 mb-6">Top Selling Items</h3>
+          <div className="h-[300px]">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={sortedItems} layout="vertical" margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+                <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f5f5f4" />
+                <XAxis type="number" hide />
+                <YAxis dataKey="name" type="category" axisLine={false} tickLine={false} tick={{ fill: '#78716c', fontSize: 12 }} width={120} />
+                <Tooltip 
+                  cursor={{ fill: '#fafaf9' }}
+                  contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1)' }}
+                />
+                <Bar dataKey="count" fill="var(--primary)" radius={[0, 4, 4, 0]} barSize={32} />
+              </BarChart>
+            </ResponsiveContainer>
+          </div>
+        </div>
+
+        <div className="premium-card p-8 flex flex-col">
+          <h3 className="text-xl font-serif italic text-stone-800 mb-6">Pending Payments</h3>
+          <div className="flex-1 overflow-y-auto space-y-4 pr-2">
+            {pendingPaymentOrders.length === 0 ? (
+              <div className="h-full flex flex-col items-center justify-center text-stone-400">
+                <CheckCircle2 className="w-12 h-12 mb-2 opacity-20" />
+                <p className="text-sm">All payments cleared</p>
+              </div>
+            ) : (
+              pendingPaymentOrders.map(order => (
+                <div key={order.id} className="bg-stone-50 p-4 rounded-2xl border border-stone-100 flex flex-col gap-3">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <span className="text-[10px] font-bold uppercase tracking-widest text-stone-400">Table {order.tableNumber}</span>
+                      <p className="font-bold text-stone-800">{order.customerName}</p>
+                    </div>
+                    <span className="font-bold text-primary">Rs. {order.total.toFixed(2)}</span>
+                  </div>
+                  <button 
+                    onClick={() => handlePaymentReceived(order.id)}
+                    className="w-full bg-green-500 text-white py-2 rounded-xl text-xs font-bold uppercase tracking-widest hover:bg-green-600 transition-colors"
+                  >
+                    Payment Received
+                  </button>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
       </div>
 
       <div className="premium-card p-8">
@@ -735,6 +843,84 @@ function RestaurantSetup({ restaurant }: { restaurant: RestaurantProfile | null 
   });
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'success' | 'error'>('idle');
   const [seedStatus, setSeedStatus] = useState<'idle' | 'seeding' | 'success' | 'error'>('idle');
+  const [isResetting, setIsResetting] = useState(false);
+
+  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
+      alert('Please upload a valid image file (.jpg, .png, .webp)');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        let width = img.width;
+        let height = img.height;
+        const maxSize = 800;
+
+        if (width > height) {
+          if (width > maxSize) {
+            height *= maxSize / width;
+            width = maxSize;
+          }
+        } else {
+          if (height > maxSize) {
+            width *= maxSize / height;
+            height = maxSize;
+          }
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        ctx?.drawImage(img, 0, 0, width, height);
+        
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
+        setProfile({ ...profile, paymentQrUrl: dataUrl });
+      };
+      img.src = event.target?.result as string;
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleResetStats = async () => {
+    if (!confirm('Are you sure you want to reset all stats? This will delete all orders. Settings, menu items, and tables will be preserved.')) return;
+    setIsResetting(true);
+    try {
+      const ordersSnapshot = await getDocs(collection(db, 'orders'));
+      const deletePromises = ordersSnapshot.docs.map(d => deleteDoc(doc(db, 'orders', d.id)));
+      await Promise.all(deletePromises);
+      alert('Stats reset successfully.');
+    } catch (e) {
+      handleFirestoreError(e, OperationType.DELETE, 'orders');
+    } finally {
+      setIsResetting(false);
+    }
+  };
+
+  const handleResetMenu = async () => {
+    if (!confirm('Are you sure you want to reset the menu? This will delete all categories and menu items.')) return;
+    setIsResetting(true);
+    try {
+      const itemsSnapshot = await getDocs(collection(db, 'menuItems'));
+      const itemPromises = itemsSnapshot.docs.map(d => deleteDoc(doc(db, 'menuItems', d.id)));
+      
+      const catsSnapshot = await getDocs(collection(db, 'categories'));
+      const catPromises = catsSnapshot.docs.map(d => deleteDoc(doc(db, 'categories', d.id)));
+      
+      await Promise.all([...itemPromises, ...catPromises]);
+      alert('Menu reset successfully.');
+    } catch (e) {
+      handleFirestoreError(e, OperationType.DELETE, 'menuItems/categories');
+    } finally {
+      setIsResetting(false);
+    }
+  };
 
   const handleSave = async () => {
     setSaveStatus('saving');
@@ -868,6 +1054,66 @@ function RestaurantSetup({ restaurant }: { restaurant: RestaurantProfile | null 
             </div>
           </div>
         </section>
+
+        {/* Payment Settings */}
+        <section className="space-y-8 md:col-span-2">
+          <h3 className="text-2xl font-serif italic text-stone-800">Payment Settings</h3>
+          <div className="premium-card p-8 space-y-6">
+            <div>
+              <label className="text-xs font-bold text-stone-400 uppercase tracking-widest mb-2 block">Payment QR Code Image</label>
+              <div className="flex items-start gap-6">
+                {profile.paymentQrUrl ? (
+                  <div className="relative w-32 h-32 rounded-xl border border-stone-200 overflow-hidden bg-stone-50 flex-shrink-0">
+                    <img src={profile.paymentQrUrl} alt="Payment QR Code" className="w-full h-full object-contain" />
+                    <button 
+                      onClick={() => setProfile({...profile, paymentQrUrl: ''})}
+                      className="absolute top-1 right-1 bg-white/80 p-1 rounded-full text-stone-600 hover:text-red-500 hover:bg-white transition-colors"
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </div>
+                ) : (
+                  <div className="w-32 h-32 rounded-xl border-2 border-dashed border-stone-200 bg-stone-50 flex items-center justify-center flex-shrink-0">
+                    <span className="text-stone-400 text-xs text-center px-2">No QR Code</span>
+                  </div>
+                )}
+                <div className="flex-1 space-y-4">
+                  <div>
+                    <label className="premium-button bg-stone-100 text-stone-700 px-4 py-2 text-sm cursor-pointer hover:bg-stone-200 inline-block">
+                      Upload QR Code
+                      <input 
+                        type="file" 
+                        accept="image/jpeg, image/png, image/webp" 
+                        className="hidden" 
+                        onChange={handleImageUpload} 
+                      />
+                    </label>
+                    <p className="text-xs text-stone-500 mt-2">Upload a .jpg, .png, or .webp file. The image will be automatically resized to fit within database limits.</p>
+                  </div>
+                  <div>
+                    <label className="text-xs font-bold text-stone-400 uppercase tracking-widest mb-2 block">Or Provide Image URL</label>
+                    <input 
+                      type="text" 
+                      placeholder="https://example.com/my-qr-code.png"
+                      className="premium-input" 
+                      value={profile.paymentQrUrl || ''} 
+                      onChange={e => setProfile({...profile, paymentQrUrl: e.target.value})} 
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div>
+              <label className="text-xs font-bold text-stone-400 uppercase tracking-widest mb-2 block">Payment Details / Instructions</label>
+              <textarea 
+                placeholder="e.g., Please pay to eSewa ID: 98XXXXXXXX. Show the screenshot to the counter."
+                className="premium-input min-h-[100px]" 
+                value={profile.paymentDetails || ''} 
+                onChange={e => setProfile({...profile, paymentDetails: e.target.value})} 
+              />
+            </div>
+          </div>
+        </section>
       </div>
 
       <div className="pt-12 border-t border-stone-200 flex flex-wrap items-center gap-6">
@@ -898,6 +1144,45 @@ function RestaurantSetup({ restaurant }: { restaurant: RestaurantProfile | null 
           </motion.div>
         )}
       </div>
+
+      {/* Danger Zone */}
+      <section className="mt-16 pt-12 border-t border-red-100">
+        <h3 className="text-2xl font-serif italic text-red-600 mb-6 flex items-center gap-2">
+          <AlertTriangle className="w-6 h-6" />
+          Danger Zone
+        </h3>
+        <div className="premium-card border-red-100 bg-red-50/30 p-8 space-y-6">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+            <div>
+              <h4 className="font-bold text-stone-900 text-lg">Reset Statistics</h4>
+              <p className="text-stone-500 text-sm mt-1">This will permanently delete all orders and revenue data. Settings, menu items, and tables will be preserved.</p>
+            </div>
+            <button 
+              onClick={handleResetStats} 
+              disabled={isResetting}
+              className="px-6 py-3 bg-red-100 text-red-700 rounded-xl font-bold hover:bg-red-200 transition-colors disabled:opacity-50 whitespace-nowrap"
+            >
+              {isResetting ? 'Resetting...' : 'Reset Stats'}
+            </button>
+          </div>
+          
+          <div className="h-px bg-red-100 w-full" />
+          
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
+            <div>
+              <h4 className="font-bold text-stone-900 text-lg">Reset Menu</h4>
+              <p className="text-stone-500 text-sm mt-1">This will permanently delete all categories and menu items. Orders and settings will be preserved.</p>
+            </div>
+            <button 
+              onClick={handleResetMenu} 
+              disabled={isResetting}
+              className="px-6 py-3 bg-red-100 text-red-700 rounded-xl font-bold hover:bg-red-200 transition-colors disabled:opacity-50 whitespace-nowrap"
+            >
+              {isResetting ? 'Resetting...' : 'Reset Menu'}
+            </button>
+          </div>
+        </div>
+      </section>
     </motion.div>
   );
 }

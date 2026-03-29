@@ -4,7 +4,7 @@ import { RestaurantProfile, Order } from '../types';
 import { motion } from 'framer-motion';
 import { MapPin, Phone, ArrowRight, UtensilsCrossed, Clock, ChefHat, Receipt, Plus } from 'lucide-react';
 import { db } from '../lib/firebase';
-import { collection, query, where, onSnapshot } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, updateDoc, doc } from 'firebase/firestore';
 
 interface Props {
   restaurant: RestaurantProfile | null;
@@ -22,7 +22,7 @@ export default function Landing({ restaurant }: Props) {
     const q = query(
       collection(db, 'orders'),
       where('tableNumber', '==', parseInt(tableId)),
-      where('status', 'in', ['pending', 'preparing'])
+      where('status', 'in', ['pending', 'preparing', 'payment_pending'])
     );
 
     const unsubscribe = onSnapshot(q, (snapshot) => {
@@ -34,6 +34,16 @@ export default function Landing({ restaurant }: Props) {
 
     return () => unsubscribe();
   }, [tableId]);
+
+  const handleCancelOrder = async (orderId: string) => {
+    if (!confirm('Are you sure you want to cancel this order?')) return;
+    try {
+      await updateDoc(doc(db, 'orders', orderId), { status: 'cancelled' });
+    } catch (error) {
+      console.error('Error cancelling order:', error);
+      alert('Failed to cancel order. It might already be preparing.');
+    }
+  };
 
   if (!restaurant || loading) {
     return (
@@ -70,31 +80,67 @@ export default function Landing({ restaurant }: Props) {
                 </div>
               </div>
 
-              {/* Status Tracker */}
-              <div className="mb-8">
-                <div className="flex justify-between mb-2">
-                  <div className={`flex flex-col items-center gap-2 ${order.status === 'pending' || order.status === 'preparing' ? 'text-primary' : 'text-stone-300'}`}>
-                    <div className={`w-10 h-10 rounded-full flex items-center justify-center ${order.status === 'pending' || order.status === 'preparing' ? 'bg-primary/10' : 'bg-stone-100'}`}>
-                      <Clock className="w-5 h-5" />
+              {order.status === 'payment_pending' ? (
+                <div className="mb-8 text-center bg-stone-50 p-6 rounded-2xl border border-stone-100">
+                  <h3 className="text-xl font-serif italic text-stone-800 mb-4">Payment Required</h3>
+                  {restaurant.paymentQrUrl ? (
+                    <div className="mb-4">
+                      <img 
+                        src={restaurant.paymentQrUrl} 
+                        alt="Payment QR Code" 
+                        className="w-48 h-48 object-contain mx-auto rounded-xl shadow-sm border border-stone-200"
+                        referrerPolicy="no-referrer"
+                      />
                     </div>
-                    <span className="text-[10px] font-bold uppercase tracking-widest">Received</span>
-                  </div>
-                  <div className={`flex flex-col items-center gap-2 ${order.status === 'preparing' ? 'text-amber-500' : 'text-stone-300'}`}>
-                    <div className={`w-10 h-10 rounded-full flex items-center justify-center ${order.status === 'preparing' ? 'bg-amber-50' : 'bg-stone-100'}`}>
-                      <ChefHat className="w-5 h-5" />
+                  ) : (
+                    <div className="w-48 h-48 bg-stone-200 rounded-xl mx-auto mb-4 flex items-center justify-center text-stone-400">
+                      No QR Code
                     </div>
-                    <span className="text-[10px] font-bold uppercase tracking-widest">Preparing</span>
+                  )}
+                  <p className="text-2xl font-bold text-primary mb-2">Rs. {order.total.toFixed(2)}</p>
+                  {restaurant.paymentDetails && (
+                    <p className="text-sm text-stone-500 mt-4 whitespace-pre-wrap">{restaurant.paymentDetails}</p>
+                  )}
+                  <p className="text-xs text-stone-400 mt-4 uppercase tracking-widest font-bold">Please show payment proof at counter</p>
+                </div>
+              ) : (
+                <>
+                  {/* Status Tracker */}
+                  <div className="mb-8">
+                    <div className="flex justify-between mb-2">
+                      <div className={`flex flex-col items-center gap-2 ${order.status === 'pending' || order.status === 'preparing' ? 'text-primary' : 'text-stone-300'}`}>
+                        <div className={`w-10 h-10 rounded-full flex items-center justify-center ${order.status === 'pending' || order.status === 'preparing' ? 'bg-primary/10' : 'bg-stone-100'}`}>
+                          <Clock className="w-5 h-5" />
+                        </div>
+                        <span className="text-[10px] font-bold uppercase tracking-widest">Received</span>
+                      </div>
+                      <div className={`flex flex-col items-center gap-2 ${order.status === 'preparing' ? 'text-amber-500' : 'text-stone-300'}`}>
+                        <div className={`w-10 h-10 rounded-full flex items-center justify-center ${order.status === 'preparing' ? 'bg-amber-50' : 'bg-stone-100'}`}>
+                          <ChefHat className="w-5 h-5" />
+                        </div>
+                        <span className="text-[10px] font-bold uppercase tracking-widest">Preparing</span>
+                      </div>
+                    </div>
+                    <div className="relative h-2 bg-stone-100 rounded-full overflow-hidden">
+                      <motion.div 
+                        className={`absolute top-0 left-0 h-full ${order.status === 'preparing' ? 'bg-amber-500' : 'bg-primary'}`}
+                        initial={{ width: '0%' }}
+                        animate={{ width: order.status === 'preparing' ? '100%' : '50%' }}
+                        transition={{ duration: 0.5 }}
+                      />
+                    </div>
                   </div>
-                </div>
-                <div className="relative h-2 bg-stone-100 rounded-full overflow-hidden">
-                  <motion.div 
-                    className={`absolute top-0 left-0 h-full ${order.status === 'preparing' ? 'bg-amber-500' : 'bg-primary'}`}
-                    initial={{ width: '0%' }}
-                    animate={{ width: order.status === 'preparing' ? '100%' : '50%' }}
-                    transition={{ duration: 0.5 }}
-                  />
-                </div>
-              </div>
+
+                  {order.status === 'pending' && (
+                    <button
+                      onClick={() => handleCancelOrder(order.id)}
+                      className="w-full mb-6 py-3 rounded-xl border border-red-200 text-red-500 text-sm font-bold uppercase tracking-widest hover:bg-red-50 transition-colors"
+                    >
+                      Cancel Order
+                    </button>
+                  )}
+                </>
+              )}
 
               {/* Items */}
               <div className="space-y-3">
