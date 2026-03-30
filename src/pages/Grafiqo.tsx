@@ -20,12 +20,21 @@ export default function Grafiqo() {
     return () => unsubRestaurant();
   }, []);
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (secretKey === 'Grafiqo@hotel') {
-      setIsAuthenticated(true);
-    } else {
-      alert('Invalid secret key');
+    try {
+      const hashBuffer = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(secretKey));
+      const hashArray = Array.from(new Uint8Array(hashBuffer));
+      const hashHex = hashArray.map(b => b.toString(16).padStart(2, '0')).join('');
+      
+      if (hashHex === '5cf22dc0d7db95437f38491144c81b282a713aff888921e5cae398df39b6921a') {
+        setIsAuthenticated(true);
+      } else {
+        alert('Invalid secret key');
+      }
+    } catch (err) {
+      console.error('Error verifying key:', err);
+      alert('Error verifying key');
     }
   };
 

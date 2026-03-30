@@ -82,13 +82,13 @@ export default function KitchenDashboard() {
   return (
     <div className="min-h-screen bg-stone-950 text-stone-100 flex flex-col">
       {/* Header */}
-      <header className="bg-stone-900/50 backdrop-blur-xl border-b border-stone-800 px-8 py-6 flex items-center justify-between sticky top-0 z-30">
-        <div className="flex items-center gap-4">
-          <div className="w-12 h-12 bg-primary rounded-2xl flex items-center justify-center shadow-lg shadow-primary/20">
-            <ChefHat className="w-7 h-7 text-white" />
+      <header className="bg-stone-900/50 backdrop-blur-xl border-b border-stone-800 px-4 md:px-8 py-4 md:py-6 flex flex-col md:flex-row items-start md:items-center justify-between gap-4 sticky top-0 z-30">
+        <div className="flex items-center gap-3 md:gap-4">
+          <div className="w-10 h-10 md:w-12 md:h-12 bg-primary rounded-xl md:rounded-2xl flex items-center justify-center shadow-lg shadow-primary/20">
+            <ChefHat className="w-6 h-6 md:w-7 md:h-7 text-white" />
           </div>
           <div>
-            <h1 className="text-2xl font-serif italic">Kitchen Dashboard</h1>
+            <h1 className="text-xl md:text-2xl font-serif italic">Kitchen Dashboard</h1>
             <div className="flex items-center gap-2">
               <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
               <span className="text-[10px] text-stone-500 uppercase tracking-widest font-bold">Live Order Stream</span>
@@ -96,16 +96,16 @@ export default function KitchenDashboard() {
           </div>
         </div>
 
-        <div className="flex items-center gap-6">
-          <div className="flex items-center gap-3 bg-stone-800/50 px-4 py-2 rounded-full border border-stone-700">
-            <Bell className="w-4 h-4 text-primary" />
-            <span className="text-sm font-bold text-stone-300">{orders.length} Active Orders</span>
+        <div className="flex items-center gap-4 md:gap-6 w-full md:w-auto justify-between md:justify-end">
+          <div className="flex items-center gap-2 md:gap-3 bg-stone-800/50 px-3 md:px-4 py-1.5 md:py-2 rounded-full border border-stone-700">
+            <Bell className="w-3 h-3 md:w-4 md:h-4 text-primary" />
+            <span className="text-xs md:text-sm font-bold text-stone-300">{orders.length} Active Orders</span>
           </div>
           <button 
             onClick={handleLogout}
-            className="p-3 hover:bg-stone-800 rounded-full transition-colors text-stone-500 hover:text-white"
+            className="p-2 md:p-3 hover:bg-stone-800 rounded-full transition-colors text-stone-500 hover:text-white"
           >
-            <LogOut className="w-6 h-6" />
+            <LogOut className="w-5 h-5 md:w-6 md:h-6" />
           </button>
         </div>
       </header>
@@ -138,14 +138,14 @@ export default function KitchenDashboard() {
       </AnimatePresence>
 
       {/* Orders Grid */}
-      <main className="flex-1 p-8 overflow-y-auto">
+      <main className="flex-1 p-4 md:p-8 overflow-y-auto">
         {orders.length === 0 ? (
           <div className="h-full flex flex-col items-center justify-center text-stone-600">
-            <UtensilsCrossed className="w-20 h-20 mb-6 opacity-20" />
-            <p className="text-xl font-serif italic">No pending orders. Take a breath.</p>
+            <UtensilsCrossed className="w-16 h-16 md:w-20 md:h-20 mb-4 md:mb-6 opacity-20" />
+            <p className="text-lg md:text-xl font-serif italic text-center">No pending orders. Take a breath.</p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-8">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 md:gap-8">
             <AnimatePresence mode="popLayout">
               {orders.map(order => (
                 <motion.div
@@ -161,18 +161,18 @@ export default function KitchenDashboard() {
                 >
                   {/* Order Header */}
                   <div className={cn(
-                    "p-6 flex items-center justify-between",
+                    "p-4 md:p-6 flex items-center justify-between",
                     order.status === 'preparing' ? "bg-primary/10" : "bg-stone-800/30"
                   )}>
                     <div>
                       <div className="flex items-center gap-2 mb-1">
                         <span className="text-stone-500 text-[10px] font-bold uppercase tracking-widest">Table</span>
-                        <span className="text-2xl font-serif italic text-white">{order.tableNumber}</span>
+                        <span className="text-xl md:text-2xl font-serif italic text-white">{order.tableNumber}</span>
                       </div>
                       <h3 className="text-sm font-bold text-stone-300 truncate max-w-[150px]">{order.customerName}</h3>
                     </div>
                     <div className="text-right">
-                      <div className="flex items-center gap-1 text-stone-500 text-[10px] font-bold uppercase tracking-widest mb-1">
+                      <div className="flex items-center justify-end gap-1 text-stone-500 text-[10px] font-bold uppercase tracking-widest mb-1">
                         <Timer className="w-3 h-3" />
                         {formatDistanceToNow(new Date(order.createdAt))} ago
                       </div>
@@ -181,15 +181,15 @@ export default function KitchenDashboard() {
                   </div>
 
                   {/* Order Items */}
-                  <div className="p-6 flex-1 space-y-4">
+                  <div className="p-4 md:p-6 flex-1 space-y-4">
                     <div className="space-y-3">
                       {order.items.map((item, idx) => (
                         <div key={idx} className="flex items-start justify-between group">
                           <div className="flex items-center gap-3">
-                            <span className="w-8 h-8 rounded-lg bg-stone-800 flex items-center justify-center text-primary font-bold text-sm">
+                            <span className="w-7 h-7 md:w-8 md:h-8 rounded-lg bg-stone-800 flex items-center justify-center text-primary font-bold text-sm">
                               {item.quantity}
                             </span>
-                            <span className="text-stone-200 font-medium group-hover:text-white transition-colors">
+                            <span className="text-stone-200 font-medium group-hover:text-white transition-colors text-sm md:text-base">
                               {item.name}
                             </span>
                           </div>
@@ -198,8 +198,8 @@ export default function KitchenDashboard() {
                     </div>
 
                     {order.notes && (
-                      <div className="mt-6 p-4 bg-stone-800/50 rounded-2xl border border-stone-700/50 flex gap-3">
-                        <AlertCircle className="w-5 h-5 text-amber-500 flex-shrink-0" />
+                      <div className="mt-4 md:mt-6 p-3 md:p-4 bg-stone-800/50 rounded-xl md:rounded-2xl border border-stone-700/50 flex gap-2 md:gap-3">
+                        <AlertCircle className="w-4 h-4 md:w-5 md:h-5 text-amber-500 flex-shrink-0" />
                         <p className="text-xs text-stone-400 italic leading-relaxed">
                           "{order.notes}"
                         </p>
@@ -208,7 +208,7 @@ export default function KitchenDashboard() {
                   </div>
 
                   {/* Actions */}
-                  <div className="p-6 pt-0 mt-auto flex flex-col gap-2">
+                  <div className="p-4 md:p-6 pt-0 mt-auto flex flex-col gap-2">
                     {order.status === 'pending' ? (
                       <div className="flex gap-2">
                         <button

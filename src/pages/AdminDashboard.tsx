@@ -39,7 +39,10 @@ import {
   Search,
   Banknote,
   TrendingUp,
-  AlertTriangle
+  AlertTriangle,
+  Shield,
+  Menu,
+  X as XIcon
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { QRCodeSVG } from 'qrcode.react';
@@ -53,13 +56,15 @@ function cn(...inputs: ClassValue[]) {
 }
 
 export default function AdminDashboard() {
-  const [activeTab, setActiveTab] = useState<'overview' | 'menu' | 'tables'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'orders' | 'menu' | 'tables'>('overview');
   const [restaurant, setRestaurant] = useState<RestaurantProfile | null>(null);
   const [categories, setCategories] = useState<Category[]>([]);
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
   const [tables, setTables] = useState<Table[]>([]);
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [showSubInfo, setShowSubInfo] = useState(false);
 
   // Fetch Data
   useEffect(() => {
@@ -97,19 +102,59 @@ export default function AdminDashboard() {
 
   if (loading) return <div className="h-screen flex items-center justify-center">Loading...</div>;
 
+  const currentEndDate = restaurant?.subscription?.endDate ? new Date(restaurant.subscription.endDate) : null;
+  const daysRemaining = currentEndDate ? Math.ceil((currentEndDate.getTime() - new Date().getTime()) / (1000 * 3600 * 24)) : 0;
+  const shieldColor = daysRemaining <= 0 ? 'text-red-500' : daysRemaining <= 2 ? 'text-yellow-500' : 'text-green-500';
+
+  const closeMobileMenu = () => setIsMobileMenuOpen(false);
+
   return (
-    <div className="min-h-screen bg-stone-50 flex">
+    <div className="min-h-screen bg-stone-50 flex flex-col md:flex-row">
+      {/* Mobile Header */}
+      <div className="md:hidden bg-white border-b border-stone-100 p-4 flex items-center justify-between sticky top-0 z-40">
+        <div className="flex items-center gap-3">
+          <div className="w-8 h-8 bg-stone-800 rounded-lg flex items-center justify-center shadow-lg transform -rotate-6">
+            <Utensils className="w-4 h-4 text-white" />
+          </div>
+          <h1 className="text-lg font-serif italic text-stone-900 leading-tight">{restaurant?.name || 'Admin'}</h1>
+        </div>
+        <button onClick={() => setIsMobileMenuOpen(true)} className="p-2 text-stone-600 hover:bg-stone-50 rounded-lg">
+          <Menu className="w-6 h-6" />
+        </button>
+      </div>
+
+      {/* Sidebar Overlay */}
+      <AnimatePresence>
+        {isMobileMenuOpen && (
+          <motion.div 
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={closeMobileMenu}
+            className="fixed inset-0 bg-stone-900/40 backdrop-blur-sm z-40 md:hidden"
+          />
+        )}
+      </AnimatePresence>
+
       {/* Sidebar */}
-      <aside className="w-72 bg-white border-r border-stone-100 flex flex-col sticky top-0 h-screen">
+      <aside className={cn(
+        "fixed md:sticky top-0 left-0 h-screen w-72 bg-white border-r border-stone-100 flex flex-col z-50 transition-transform duration-300",
+        isMobileMenuOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"
+      )}>
         <div className="p-8">
-          <div className="flex items-center gap-3 mb-10">
-            <div className="w-10 h-10 bg-stone-800 rounded-xl flex items-center justify-center shadow-lg transform -rotate-6">
-              <Utensils className="w-6 h-6 text-white" />
+          <div className="flex items-center justify-between mb-10">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-stone-800 rounded-xl flex items-center justify-center shadow-lg transform -rotate-6">
+                <Utensils className="w-6 h-6 text-white" />
+              </div>
+              <div>
+                <h1 className="text-xl font-serif italic text-stone-900 leading-tight">{restaurant?.name || 'Admin'}</h1>
+                <span className="text-[10px] text-stone-400 uppercase tracking-widest font-bold">Reception Hub</span>
+              </div>
             </div>
-            <div>
-              <h1 className="text-xl font-serif italic text-stone-900 leading-tight">{restaurant?.name || 'Admin'}</h1>
-              <span className="text-[10px] text-stone-400 uppercase tracking-widest font-bold">Reception Hub</span>
-            </div>
+            <button onClick={closeMobileMenu} className="md:hidden p-2 text-stone-400 hover:bg-stone-50 rounded-full">
+              <XIcon className="w-5 h-5" />
+            </button>
           </div>
 
           <nav className="space-y-2">
@@ -117,19 +162,25 @@ export default function AdminDashboard() {
               icon={<LayoutDashboard className="w-5 h-5" />} 
               label="Overview" 
               active={activeTab === 'overview'} 
-              onClick={() => setActiveTab('overview')} 
+              onClick={() => { setActiveTab('overview'); closeMobileMenu(); }} 
+            />
+            <SidebarItem 
+              icon={<Clock className="w-5 h-5" />} 
+              label="Recent Orders" 
+              active={activeTab === 'orders'} 
+              onClick={() => { setActiveTab('orders'); closeMobileMenu(); }} 
             />
             <SidebarItem 
               icon={<Utensils className="w-5 h-5" />} 
               label="Menu Manager" 
               active={activeTab === 'menu'} 
-              onClick={() => setActiveTab('menu')} 
+              onClick={() => { setActiveTab('menu'); closeMobileMenu(); }} 
             />
             <SidebarItem 
               icon={<TableIcon className="w-5 h-5" />} 
               label="Tables & QR" 
               active={activeTab === 'tables'} 
-              onClick={() => setActiveTab('tables')} 
+              onClick={() => { setActiveTab('tables'); closeMobileMenu(); }} 
             />
           </nav>
         </div>
@@ -146,23 +197,54 @@ export default function AdminDashboard() {
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1 p-12 overflow-y-auto">
-        <header className="flex justify-between items-center mb-12">
+      <main className="flex-1 p-4 md:p-12 overflow-y-auto w-full">
+        <header className="flex flex-col md:flex-row md:justify-between md:items-center gap-4 mb-8 md:mb-12">
           <div>
-            <h2 className="text-4xl font-serif italic text-stone-900 mb-2 capitalize">{activeTab}</h2>
-            <p className="text-stone-400 font-medium">Manage your restaurant operations in real-time.</p>
+            <h2 className="text-3xl md:text-4xl font-serif italic text-stone-900 mb-2 capitalize">{activeTab}</h2>
+            <p className="text-stone-400 font-medium text-sm md:text-base">Manage your restaurant operations in real-time.</p>
           </div>
           
-          <div className="flex items-center gap-4">
-            <div className="bg-white rounded-full px-6 py-3 border border-stone-100 shadow-sm flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-4 relative">
+            <div className="bg-white rounded-full px-4 md:px-6 py-2 md:py-3 border border-stone-100 shadow-sm flex items-center gap-3">
               <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
-              <span className="text-stone-600 font-bold text-xs uppercase tracking-widest">Live Sync Active</span>
+              <span className="text-stone-600 font-bold text-[10px] md:text-xs uppercase tracking-widest">Live Sync Active</span>
             </div>
+            
+            <button 
+              onClick={() => setShowSubInfo(!showSubInfo)}
+              className="bg-white rounded-full p-2 md:p-3 border border-stone-100 shadow-sm hover:bg-stone-50 transition-colors relative"
+            >
+              <Shield className={cn("w-5 h-5", shieldColor)} />
+            </button>
+            
+            <AnimatePresence>
+              {showSubInfo && (
+                <motion.div 
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: 10 }}
+                  className="absolute top-full right-0 mt-2 w-64 bg-white rounded-2xl p-4 shadow-xl border border-stone-100 z-50"
+                >
+                  <h4 className="font-bold text-stone-800 mb-2 text-sm">Subscription Status</h4>
+                  {currentEndDate ? (
+                    <>
+                      <p className={cn("text-lg font-serif italic mb-1", shieldColor)}>
+                        {daysRemaining > 0 ? `${daysRemaining} Days Remaining` : 'Expired'}
+                      </p>
+                      <p className="text-xs text-stone-500">Ends on {format(currentEndDate, 'MMM dd, yyyy')}</p>
+                    </>
+                  ) : (
+                    <p className="text-sm text-stone-500">No active subscription</p>
+                  )}
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
         </header>
 
         <AnimatePresence mode="wait">
           {activeTab === 'overview' && <Overview orders={orders} restaurant={restaurant} />}
+          {activeTab === 'orders' && <RecentOrders orders={orders} />}
           {activeTab === 'menu' && <MenuManager categories={categories} menuItems={menuItems} />}
           {activeTab === 'tables' && <TableManager tables={tables} />}
         </AnimatePresence>
@@ -371,7 +453,7 @@ function Overview({ orders, restaurant }: { orders: Order[], restaurant: Restaur
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <div className="lg:col-span-2 premium-card p-8">
+        <div className="lg:col-span-2 premium-card p-4 md:p-8">
           <h3 className="text-xl font-serif italic text-stone-800 mb-6">Top Selling Items</h3>
           <div className="h-[300px]">
             <ResponsiveContainer width="100%" height="100%">
@@ -389,11 +471,11 @@ function Overview({ orders, restaurant }: { orders: Order[], restaurant: Restaur
           </div>
         </div>
 
-        <div className="premium-card p-8 flex flex-col">
+        <div className="premium-card p-4 md:p-8 flex flex-col">
           <h3 className="text-xl font-serif italic text-stone-800 mb-6">Pending Payments</h3>
           <div className="flex-1 overflow-y-auto space-y-4 pr-2">
             {pendingPaymentOrders.length === 0 ? (
-              <div className="h-full flex flex-col items-center justify-center text-stone-400">
+              <div className="h-full flex flex-col items-center justify-center text-stone-400 py-8">
                 <CheckCircle2 className="w-12 h-12 mb-2 opacity-20" />
                 <p className="text-sm">All payments cleared</p>
               </div>
@@ -419,17 +501,41 @@ function Overview({ orders, restaurant }: { orders: Order[], restaurant: Restaur
           </div>
         </div>
       </div>
+    </motion.div>
+  );
+}
 
-      <div className="premium-card p-8">
-        <div className="flex items-center justify-between mb-8">
-          <h3 className="text-2xl font-serif italic text-stone-800">Recent Orders</h3>
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-300" />
-            <input type="text" placeholder="Search orders..." className="pl-10 pr-4 py-2 bg-stone-50 rounded-full text-sm border-none focus:ring-2 focus:ring-primary/10" />
-          </div>
+function RecentOrders({ orders }: { orders: Order[] }) {
+  const [searchTerm, setSearchTerm] = useState('');
+
+  const filteredOrders = orders.filter(order => 
+    order.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    order.customerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    order.tableNumber.toString().includes(searchTerm)
+  );
+
+  return (
+    <motion.div 
+      initial={{ opacity: 0, y: 20 }}
+      animate={{ opacity: 1, y: 0 }}
+      className="premium-card p-4 md:p-8"
+    >
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+        <h3 className="text-2xl font-serif italic text-stone-800">Recent Orders</h3>
+        <div className="relative w-full md:w-auto">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-300" />
+          <input 
+            type="text" 
+            placeholder="Search orders..." 
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full md:w-64 pl-10 pr-4 py-2 bg-stone-50 rounded-full text-sm border-none focus:ring-2 focus:ring-primary/10" 
+          />
         </div>
+      </div>
 
-        <div className="overflow-x-auto">
+      <div className="overflow-x-auto -mx-4 md:mx-0">
+        <div className="min-w-[800px] px-4 md:px-0">
           <table className="w-full">
             <thead>
               <tr className="text-left text-stone-400 text-[10px] uppercase tracking-widest font-bold border-b border-stone-50">
@@ -443,7 +549,7 @@ function Overview({ orders, restaurant }: { orders: Order[], restaurant: Restaur
               </tr>
             </thead>
             <tbody className="divide-y divide-stone-50">
-              {orders.map(order => (
+              {filteredOrders.map(order => (
                 <tr key={order.id} className="group hover:bg-stone-50/50 transition-colors">
                   <td className="py-6 font-mono text-xs text-stone-400">#{order.id.slice(-6)}</td>
                   <td className="py-6 font-bold text-stone-800">{order.customerName}</td>
@@ -474,12 +580,12 @@ function Overview({ orders, restaurant }: { orders: Order[], restaurant: Restaur
 
 function StatCard({ label, value, icon }: { label: string, value: string | number, icon: any }) {
   return (
-    <div className="premium-card p-8 flex items-center justify-between">
+    <div className="premium-card p-6 md:p-8 flex items-center justify-between">
       <div>
-        <p className="text-stone-400 text-xs uppercase tracking-widest font-bold mb-2">{label}</p>
-        <h4 className="text-4xl font-serif italic text-stone-900">{value}</h4>
+        <p className="text-stone-400 text-[10px] md:text-xs uppercase tracking-widest font-bold mb-2">{label}</p>
+        <h4 className="text-2xl md:text-4xl font-serif italic text-stone-900">{value}</h4>
       </div>
-      <div className="w-14 h-14 bg-stone-50 rounded-2xl flex items-center justify-center text-2xl">
+      <div className="w-12 h-12 md:w-14 md:h-14 bg-stone-50 rounded-2xl flex items-center justify-center text-xl md:text-2xl">
         {icon}
       </div>
     </div>
@@ -574,11 +680,11 @@ function MenuManager({ categories, menuItems }: { categories: Category[], menuIt
     >
       {/* Categories */}
       <section>
-        <div className="flex items-center justify-between mb-8">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
           <h3 className="text-2xl font-serif italic text-stone-800">Categories</h3>
           <button 
             onClick={() => setIsAddingCat(true)}
-            className="premium-button bg-stone-800 text-white text-sm flex items-center gap-2"
+            className="premium-button bg-stone-800 text-white text-sm flex items-center justify-center gap-2 w-full md:w-auto"
           >
             <Plus className="w-4 h-4" /> Add Category
           </button>
@@ -609,11 +715,11 @@ function MenuManager({ categories, menuItems }: { categories: Category[], menuIt
 
       {/* Menu Items */}
       <section>
-        <div className="flex items-center justify-between mb-8">
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
           <h3 className="text-2xl font-serif italic text-stone-800">Menu Items</h3>
           <button 
             onClick={() => setIsAddingItem(true)}
-            className="premium-button bg-primary text-white text-sm flex items-center gap-2"
+            className="premium-button bg-primary text-white text-sm flex items-center justify-center gap-2 w-full md:w-auto"
           >
             <Plus className="w-4 h-4" /> Add New Dish
           </button>
@@ -843,11 +949,11 @@ function TableManager({ tables }: { tables: Table[] }) {
       animate={{ opacity: 1, y: 0 }}
       className="space-y-12"
     >
-      <div className="flex items-center justify-between mb-8">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
         <h3 className="text-2xl font-serif italic text-stone-800">Tables & QR Codes</h3>
         <button 
           onClick={() => setIsAdding(true)}
-          className="premium-button bg-stone-800 text-white text-sm flex items-center gap-2"
+          className="premium-button bg-stone-800 text-white text-sm flex items-center justify-center gap-2 w-full md:w-auto"
         >
           <Plus className="w-4 h-4" /> Add Table
         </button>
