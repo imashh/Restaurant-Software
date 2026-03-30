@@ -4,6 +4,10 @@ export interface RestaurantTheme {
   accentColor: string;
 }
 
+export interface Subscription {
+  endDate: string; // ISO string
+}
+
 export interface RestaurantProfile {
   name: string;
   logoUrl?: string;
@@ -13,6 +17,7 @@ export interface RestaurantProfile {
   theme?: RestaurantTheme;
   paymentQrUrl?: string;
   paymentDetails?: string;
+  subscription?: Subscription;
 }
 
 export interface Category {

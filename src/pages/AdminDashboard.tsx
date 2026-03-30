@@ -53,7 +53,7 @@ function cn(...inputs: ClassValue[]) {
 }
 
 export default function AdminDashboard() {
-  const [activeTab, setActiveTab] = useState<'overview' | 'menu' | 'tables' | 'settings'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'menu' | 'tables'>('overview');
   const [restaurant, setRestaurant] = useState<RestaurantProfile | null>(null);
   const [categories, setCategories] = useState<Category[]>([]);
   const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
@@ -131,12 +131,6 @@ export default function AdminDashboard() {
               active={activeTab === 'tables'} 
               onClick={() => setActiveTab('tables')} 
             />
-            <SidebarItem 
-              icon={<Settings className="w-5 h-5" />} 
-              label="Restaurant Setup" 
-              active={activeTab === 'settings'} 
-              onClick={() => setActiveTab('settings')} 
-            />
           </nav>
         </div>
 
@@ -168,13 +162,88 @@ export default function AdminDashboard() {
         </header>
 
         <AnimatePresence mode="wait">
-          {activeTab === 'overview' && <Overview orders={orders} />}
+          {activeTab === 'overview' && <Overview orders={orders} restaurant={restaurant} />}
           {activeTab === 'menu' && <MenuManager categories={categories} menuItems={menuItems} />}
           {activeTab === 'tables' && <TableManager tables={tables} />}
-          {activeTab === 'settings' && <RestaurantSetup restaurant={restaurant} />}
         </AnimatePresence>
       </main>
+
+      {/* Subscription Modals */}
+      <SubscriptionModals restaurant={restaurant} />
     </div>
+  );
+}
+
+function SubscriptionModals({ restaurant }: { restaurant: RestaurantProfile | null }) {
+  const [showReminder, setShowReminder] = useState(false);
+  
+  const currentEndDate = restaurant?.subscription?.endDate ? new Date(restaurant.subscription.endDate) : null;
+  const daysRemaining = currentEndDate ? Math.ceil((currentEndDate.getTime() - new Date().getTime()) / (1000 * 3600 * 24)) : 0;
+  const isExpired = currentEndDate && daysRemaining <= 0;
+  const isEndingSoon = currentEndDate && daysRemaining > 0 && daysRemaining <= 2;
+
+  useEffect(() => {
+    if (isEndingSoon) {
+      const lastReminder = localStorage.getItem('subscriptionReminder');
+      const today = new Date().toDateString();
+      if (lastReminder !== today) {
+        setShowReminder(true);
+        localStorage.setItem('subscriptionReminder', today);
+      }
+    }
+  }, [isEndingSoon]);
+
+  return (
+    <AnimatePresence>
+      {isExpired && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-stone-900/80 backdrop-blur-sm">
+          <motion.div 
+            initial={{ scale: 0.9, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            className="bg-white rounded-[3rem] p-10 shadow-2xl w-full max-w-lg text-center"
+          >
+            <div className="w-20 h-20 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-6">
+              <AlertTriangle className="w-10 h-10 text-red-500" />
+            </div>
+            <h3 className="text-3xl font-serif italic text-stone-900 mb-4">Subscription Ended</h3>
+            <p className="text-stone-500 mb-8">
+              Renew your subscription to use the app. Contact your administrator.
+            </p>
+          </motion.div>
+        </div>
+      )}
+
+      {showReminder && !isExpired && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-stone-900/40 backdrop-blur-sm">
+          <motion.div 
+            initial={{ scale: 0.9, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            exit={{ scale: 0.9, opacity: 0 }}
+            className="bg-white rounded-[3rem] p-10 shadow-2xl w-full max-w-lg text-center relative"
+          >
+            <button 
+              onClick={() => setShowReminder(false)}
+              className="absolute top-6 right-6 p-2 text-stone-400 hover:bg-stone-50 rounded-full transition-colors"
+            >
+              <X className="w-6 h-6" />
+            </button>
+            <div className="w-20 h-20 bg-orange-100 rounded-full flex items-center justify-center mx-auto mb-6">
+              <Clock className="w-10 h-10 text-orange-500" />
+            </div>
+            <h3 className="text-3xl font-serif italic text-stone-900 mb-4">Subscription Ending Soon</h3>
+            <p className="text-stone-500 mb-8">
+              Your subscription will end in {daysRemaining} days. Please timely renew the subscription. Contact your administrator.
+            </p>
+            <button 
+              onClick={() => setShowReminder(false)}
+              className="w-full premium-button bg-stone-800 text-white py-4"
+            >
+              Acknowledge
+            </button>
+          </motion.div>
+        </div>
+      )}
+    </AnimatePresence>
   );
 }
 
@@ -198,7 +267,8 @@ function SidebarItem({ icon, label, active, onClick }: { icon: any, label: strin
 
 // --- Sub-components ---
 
-function Overview({ orders }: { orders: Order[] }) {
+function Overview({ orders, restaurant }: { orders: Order[], restaurant: RestaurantProfile | null }) {
+  const [showSubPopup, setShowSubPopup] = useState(false);
   const activeOrders = orders.filter(o => o.status !== 'completed' && o.status !== 'cancelled');
   const completedOrders = orders.filter(o => o.status === 'completed');
   
@@ -239,7 +309,14 @@ function Overview({ orders }: { orders: Order[] }) {
 
   const mostSoldItem = sortedItems.length > 0 ? sortedItems[0].name : 'N/A';
 
+  const currentEndDate = restaurant?.subscription?.endDate ? new Date(restaurant.subscription.endDate) : null;
+  const isExpired = currentEndDate && Math.ceil((currentEndDate.getTime() - new Date().getTime()) / (1000 * 3600 * 24)) <= 0;
+
   const handlePaymentReceived = async (orderId: string) => {
+    if (isExpired) {
+      setShowSubPopup(true);
+      return;
+    }
     try {
       await updateDoc(doc(db, 'orders', orderId), { status: 'completed' });
     } catch (e) {
@@ -253,6 +330,32 @@ function Overview({ orders }: { orders: Order[] }) {
       animate={{ opacity: 1, y: 0 }}
       className="space-y-8"
     >
+      <AnimatePresence>
+        {showSubPopup && (
+          <div className="fixed inset-0 z-[110] flex items-center justify-center p-6 bg-stone-900/40 backdrop-blur-sm">
+            <motion.div 
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="bg-white rounded-[3rem] p-10 shadow-2xl w-full max-w-lg text-center relative"
+            >
+              <button 
+                onClick={() => setShowSubPopup(false)}
+                className="absolute top-6 right-6 p-2 text-stone-400 hover:bg-stone-50 rounded-full transition-colors"
+              >
+                <X className="w-6 h-6" />
+              </button>
+              <div className="w-20 h-20 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                <AlertTriangle className="w-10 h-10 text-red-500" />
+              </div>
+              <h3 className="text-3xl font-serif italic text-stone-900 mb-4">Subscription Ended</h3>
+              <p className="text-stone-500 mb-8">
+                Renew your subscription to use the app. Contact your administrator.
+              </p>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <StatCard label="Active Orders" value={activeOrders.length} icon={<Clock className="text-amber-500" />} />
         <StatCard label="Pending Payment" value={pendingPaymentOrders.length} icon={<AlertTriangle className="text-orange-500" />} />
@@ -836,356 +939,7 @@ function TableManager({ tables }: { tables: Table[] }) {
   );
 }
 
-function RestaurantSetup({ restaurant }: { restaurant: RestaurantProfile | null }) {
-  const [profile, setProfile] = useState<RestaurantProfile>(restaurant || {
-    name: '',
-    theme: { primaryColor: '#5A5A40', secondaryColor: '#f5f5f0', accentColor: '#FF6321' }
-  });
-  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'success' | 'error'>('idle');
-  const [seedStatus, setSeedStatus] = useState<'idle' | 'seeding' | 'success' | 'error'>('idle');
-  const [isResetting, setIsResetting] = useState(false);
 
-  const handleImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
-      alert('Please upload a valid image file (.jpg, .png, .webp)');
-      return;
-    }
-
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      const img = new Image();
-      img.onload = () => {
-        const canvas = document.createElement('canvas');
-        let width = img.width;
-        let height = img.height;
-        const maxSize = 800;
-
-        if (width > height) {
-          if (width > maxSize) {
-            height *= maxSize / width;
-            width = maxSize;
-          }
-        } else {
-          if (height > maxSize) {
-            width *= maxSize / height;
-            height = maxSize;
-          }
-        }
-
-        canvas.width = width;
-        canvas.height = height;
-        const ctx = canvas.getContext('2d');
-        ctx?.drawImage(img, 0, 0, width, height);
-        
-        const dataUrl = canvas.toDataURL('image/jpeg', 0.8);
-        setProfile({ ...profile, paymentQrUrl: dataUrl });
-      };
-      img.src = event.target?.result as string;
-    };
-    reader.readAsDataURL(file);
-  };
-
-  const handleResetStats = async () => {
-    if (!confirm('Are you sure you want to reset all stats? This will delete all orders. Settings, menu items, and tables will be preserved.')) return;
-    setIsResetting(true);
-    try {
-      const ordersSnapshot = await getDocs(collection(db, 'orders'));
-      const deletePromises = ordersSnapshot.docs.map(d => deleteDoc(doc(db, 'orders', d.id)));
-      await Promise.all(deletePromises);
-      alert('Stats reset successfully.');
-    } catch (e) {
-      handleFirestoreError(e, OperationType.DELETE, 'orders');
-    } finally {
-      setIsResetting(false);
-    }
-  };
-
-  const handleResetMenu = async () => {
-    if (!confirm('Are you sure you want to reset the menu? This will delete all categories and menu items.')) return;
-    setIsResetting(true);
-    try {
-      const itemsSnapshot = await getDocs(collection(db, 'menuItems'));
-      const itemPromises = itemsSnapshot.docs.map(d => deleteDoc(doc(db, 'menuItems', d.id)));
-      
-      const catsSnapshot = await getDocs(collection(db, 'categories'));
-      const catPromises = catsSnapshot.docs.map(d => deleteDoc(doc(db, 'categories', d.id)));
-      
-      await Promise.all([...itemPromises, ...catPromises]);
-      alert('Menu reset successfully.');
-    } catch (e) {
-      handleFirestoreError(e, OperationType.DELETE, 'menuItems/categories');
-    } finally {
-      setIsResetting(false);
-    }
-  };
-
-  const handleSave = async () => {
-    setSaveStatus('saving');
-    try {
-      await setDoc(doc(db, 'settings', 'restaurant'), profile);
-      setSaveStatus('success');
-      setTimeout(() => setSaveStatus('idle'), 3000);
-    } catch (e) { 
-      handleFirestoreError(e, OperationType.WRITE, 'settings/restaurant');
-      setSaveStatus('error');
-    }
-  };
-
-  const seedData = async () => {
-    if (!confirm('This will add example categories, menu items, and tables to your database. Continue?')) return;
-    
-    setSeedStatus('seeding');
-    try {
-      // Add Categories
-      const categories = [
-        { name: 'Appetizers', order: 0 },
-        { name: 'Main Course', order: 1 },
-        { name: 'Desserts', order: 2 },
-        { name: 'Beverages', order: 3 }
-      ];
-      
-      const catRefs: Record<string, string> = {};
-      for (const cat of categories) {
-        const docRef = await addDoc(collection(db, 'categories'), cat);
-        catRefs[cat.name] = docRef.id;
-      }
-
-      // Add Menu Items
-      const menuItems = [
-        { name: 'Bruschetta', price: 450, categoryId: catRefs['Appetizers'], description: 'Toasted bread with tomatoes and garlic', image: 'https://picsum.photos/seed/bruschetta/400/300', available: true },
-        { name: 'Paneer Tikka', price: 650, categoryId: catRefs['Appetizers'], description: 'Grilled cottage cheese with spices', image: 'https://picsum.photos/seed/paneer/400/300', available: true },
-        { name: 'Chicken Momo', price: 350, categoryId: catRefs['Appetizers'], description: 'Steamed dumplings with chicken filling', image: 'https://picsum.photos/seed/momo/400/300', available: true },
-        { name: 'Dal Bhat Thali', price: 850, categoryId: catRefs['Main Course'], description: 'Traditional Nepali meal set', image: 'https://picsum.photos/seed/dalbhat/400/300', available: true },
-        { name: 'Margherita Pizza', price: 750, categoryId: catRefs['Main Course'], description: 'Classic tomato and mozzarella pizza', image: 'https://picsum.photos/seed/pizza/400/300', available: true },
-        { name: 'Gulab Jamun', price: 250, categoryId: catRefs['Desserts'], description: 'Sweet milk dumplings in syrup', image: 'https://picsum.photos/seed/sweet/400/300', available: true },
-        { name: 'Masala Chiya', price: 150, categoryId: catRefs['Beverages'], description: 'Spiced milk tea', image: 'https://picsum.photos/seed/tea/400/300', available: true }
-      ];
-
-      for (const item of menuItems) {
-        await addDoc(collection(db, 'menuItems'), item);
-      }
-
-      // Add Tables
-      for (let i = 1; i <= 5; i++) {
-        await addDoc(collection(db, 'tables'), { number: i });
-      }
-
-      setSeedStatus('success');
-      setTimeout(() => setSeedStatus('idle'), 3000);
-    } catch (error) {
-      console.error('Error seeding data:', error);
-      setSeedStatus('error');
-    }
-  };
-
-  return (
-    <motion.div 
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      className="max-w-4xl space-y-12"
-    >
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
-        {/* Profile Info */}
-        <section className="space-y-8">
-          <h3 className="text-2xl font-serif italic text-stone-800">General Info</h3>
-          <div className="space-y-6">
-            <div>
-              <label className="text-xs font-bold text-stone-400 uppercase tracking-widest mb-2 block">Restaurant Name</label>
-              <input type="text" className="premium-input" value={profile.name || ''} onChange={e => setProfile({...profile, name: e.target.value})} />
-            </div>
-            <div>
-              <label className="text-xs font-bold text-stone-400 uppercase tracking-widest mb-2 block">Logo URL</label>
-              <input type="text" className="premium-input" value={profile.logoUrl || ''} onChange={e => setProfile({...profile, logoUrl: e.target.value})} />
-            </div>
-            <div>
-              <label className="text-xs font-bold text-stone-400 uppercase tracking-widest mb-2 block">Intro Message</label>
-              <textarea className="premium-input min-h-[100px]" value={profile.intro || ''} onChange={e => setProfile({...profile, intro: e.target.value})} />
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="text-xs font-bold text-stone-400 uppercase tracking-widest mb-2 block">Contact</label>
-                <input type="text" className="premium-input" value={profile.contact || ''} onChange={e => setProfile({...profile, contact: e.target.value})} />
-              </div>
-              <div>
-                <label className="text-xs font-bold text-stone-400 uppercase tracking-widest mb-2 block">Address</label>
-                <input type="text" className="premium-input" value={profile.address || ''} onChange={e => setProfile({...profile, address: e.target.value})} />
-              </div>
-            </div>
-          </div>
-        </section>
-
-        {/* Branding */}
-        <section className="space-y-8">
-          <h3 className="text-2xl font-serif italic text-stone-800">Visual Branding</h3>
-          <div className="premium-card p-8 space-y-8">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 rounded-2xl shadow-inner border border-stone-100" style={{ backgroundColor: profile.theme?.primaryColor }} />
-              <div className="flex-1">
-                <label className="text-xs font-bold text-stone-400 uppercase tracking-widest mb-1 block">Primary Color</label>
-                <input type="color" className="w-full h-10 rounded-lg cursor-pointer" value={profile.theme?.primaryColor || '#5A5A40'} onChange={e => setProfile({...profile, theme: {...profile.theme!, primaryColor: e.target.value}})} />
-              </div>
-            </div>
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 rounded-2xl shadow-inner border border-stone-100" style={{ backgroundColor: profile.theme?.secondaryColor }} />
-              <div className="flex-1">
-                <label className="text-xs font-bold text-stone-400 uppercase tracking-widest mb-1 block">Secondary Color</label>
-                <input type="color" className="w-full h-10 rounded-lg cursor-pointer" value={profile.theme?.secondaryColor || '#f5f5f0'} onChange={e => setProfile({...profile, theme: {...profile.theme!, secondaryColor: e.target.value}})} />
-              </div>
-            </div>
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 rounded-2xl shadow-inner border border-stone-100" style={{ backgroundColor: profile.theme?.accentColor }} />
-              <div className="flex-1">
-                <label className="text-xs font-bold text-stone-400 uppercase tracking-widest mb-1 block">Accent Color</label>
-                <input type="color" className="w-full h-10 rounded-lg cursor-pointer" value={profile.theme?.accentColor || '#FF6321'} onChange={e => setProfile({...profile, theme: {...profile.theme!, accentColor: e.target.value}})} />
-              </div>
-            </div>
-          </div>
-          
-          <div className="p-8 bg-stone-800 rounded-[2rem] text-white">
-            <h4 className="font-serif italic text-xl mb-2">Preview</h4>
-            <p className="text-stone-400 text-sm mb-6">This is how your brand colors will look across the app.</p>
-            <div className="flex gap-2">
-              <div className="px-4 py-2 rounded-full text-xs font-bold uppercase tracking-widest" style={{ backgroundColor: profile.theme?.primaryColor }}>Button</div>
-              <div className="px-4 py-2 rounded-full text-xs font-bold uppercase tracking-widest text-stone-800" style={{ backgroundColor: profile.theme?.secondaryColor }}>Badge</div>
-              <div className="px-4 py-2 rounded-full text-xs font-bold uppercase tracking-widest" style={{ backgroundColor: profile.theme?.accentColor }}>Alert</div>
-            </div>
-          </div>
-        </section>
-
-        {/* Payment Settings */}
-        <section className="space-y-8 md:col-span-2">
-          <h3 className="text-2xl font-serif italic text-stone-800">Payment Settings</h3>
-          <div className="premium-card p-8 space-y-6">
-            <div>
-              <label className="text-xs font-bold text-stone-400 uppercase tracking-widest mb-2 block">Payment QR Code Image</label>
-              <div className="flex items-start gap-6">
-                {profile.paymentQrUrl ? (
-                  <div className="relative w-32 h-32 rounded-xl border border-stone-200 overflow-hidden bg-stone-50 flex-shrink-0">
-                    <img src={profile.paymentQrUrl} alt="Payment QR Code" className="w-full h-full object-contain" />
-                    <button 
-                      onClick={() => setProfile({...profile, paymentQrUrl: ''})}
-                      className="absolute top-1 right-1 bg-white/80 p-1 rounded-full text-stone-600 hover:text-red-500 hover:bg-white transition-colors"
-                    >
-                      <X className="w-4 h-4" />
-                    </button>
-                  </div>
-                ) : (
-                  <div className="w-32 h-32 rounded-xl border-2 border-dashed border-stone-200 bg-stone-50 flex items-center justify-center flex-shrink-0">
-                    <span className="text-stone-400 text-xs text-center px-2">No QR Code</span>
-                  </div>
-                )}
-                <div className="flex-1 space-y-4">
-                  <div>
-                    <label className="premium-button bg-stone-100 text-stone-700 px-4 py-2 text-sm cursor-pointer hover:bg-stone-200 inline-block">
-                      Upload QR Code
-                      <input 
-                        type="file" 
-                        accept="image/jpeg, image/png, image/webp" 
-                        className="hidden" 
-                        onChange={handleImageUpload} 
-                      />
-                    </label>
-                    <p className="text-xs text-stone-500 mt-2">Upload a .jpg, .png, or .webp file. The image will be automatically resized to fit within database limits.</p>
-                  </div>
-                  <div>
-                    <label className="text-xs font-bold text-stone-400 uppercase tracking-widest mb-2 block">Or Provide Image URL</label>
-                    <input 
-                      type="text" 
-                      placeholder="https://example.com/my-qr-code.png"
-                      className="premium-input" 
-                      value={profile.paymentQrUrl || ''} 
-                      onChange={e => setProfile({...profile, paymentQrUrl: e.target.value})} 
-                    />
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div>
-              <label className="text-xs font-bold text-stone-400 uppercase tracking-widest mb-2 block">Payment Details / Instructions</label>
-              <textarea 
-                placeholder="e.g., Please pay to eSewa ID: 98XXXXXXXX. Show the screenshot to the counter."
-                className="premium-input min-h-[100px]" 
-                value={profile.paymentDetails || ''} 
-                onChange={e => setProfile({...profile, paymentDetails: e.target.value})} 
-              />
-            </div>
-          </div>
-        </section>
-      </div>
-
-      <div className="pt-12 border-t border-stone-200 flex flex-wrap items-center gap-6">
-        <button 
-          onClick={handleSave} 
-          disabled={saveStatus === 'saving'}
-          className="premium-button bg-stone-800 text-white px-12 py-4 text-lg font-serif italic shadow-2xl shadow-stone-200 disabled:opacity-50"
-        >
-          {saveStatus === 'saving' ? 'Saving...' : 'Save All Changes'}
-        </button>
-
-        <button
-          onClick={seedData}
-          disabled={seedStatus === 'seeding'}
-          className="px-8 py-4 rounded-full border border-stone-200 text-stone-600 hover:bg-stone-50 transition-all disabled:opacity-50 font-serif italic text-lg"
-        >
-          {seedStatus === 'seeding' ? 'Seeding...' : seedStatus === 'success' ? 'Data Seeded!' : 'Seed Example Data'}
-        </button>
-
-        {saveStatus === 'success' && (
-          <motion.div 
-            initial={{ opacity: 0, x: -20 }}
-            animate={{ opacity: 1, x: 0 }}
-            className="flex items-center gap-2 text-green-600 font-bold"
-          >
-            <CheckCircle2 className="w-5 h-5" />
-            <span>Settings saved successfully!</span>
-          </motion.div>
-        )}
-      </div>
-
-      {/* Danger Zone */}
-      <section className="mt-16 pt-12 border-t border-red-100">
-        <h3 className="text-2xl font-serif italic text-red-600 mb-6 flex items-center gap-2">
-          <AlertTriangle className="w-6 h-6" />
-          Danger Zone
-        </h3>
-        <div className="premium-card border-red-100 bg-red-50/30 p-8 space-y-6">
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-            <div>
-              <h4 className="font-bold text-stone-900 text-lg">Reset Statistics</h4>
-              <p className="text-stone-500 text-sm mt-1">This will permanently delete all orders and revenue data. Settings, menu items, and tables will be preserved.</p>
-            </div>
-            <button 
-              onClick={handleResetStats} 
-              disabled={isResetting}
-              className="px-6 py-3 bg-red-100 text-red-700 rounded-xl font-bold hover:bg-red-200 transition-colors disabled:opacity-50 whitespace-nowrap"
-            >
-              {isResetting ? 'Resetting...' : 'Reset Stats'}
-            </button>
-          </div>
-          
-          <div className="h-px bg-red-100 w-full" />
-          
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-            <div>
-              <h4 className="font-bold text-stone-900 text-lg">Reset Menu</h4>
-              <p className="text-stone-500 text-sm mt-1">This will permanently delete all categories and menu items. Orders and settings will be preserved.</p>
-            </div>
-            <button 
-              onClick={handleResetMenu} 
-              disabled={isResetting}
-              className="px-6 py-3 bg-red-100 text-red-700 rounded-xl font-bold hover:bg-red-200 transition-colors disabled:opacity-50 whitespace-nowrap"
-            >
-              {isResetting ? 'Resetting...' : 'Reset Menu'}
-            </button>
-          </div>
-        </div>
-      </section>
-    </motion.div>
-  );
-}
 
 function Modal({ title, children, onClose }: { title: string, children: React.ReactNode, onClose: () => void }) {
   return (

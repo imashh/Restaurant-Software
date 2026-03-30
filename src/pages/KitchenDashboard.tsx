@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { db, auth, handleFirestoreError, OperationType } from '../lib/firebase';
 import { collection, onSnapshot, query, orderBy, doc, updateDoc, where } from 'firebase/firestore';
-import { Order, OrderStatus } from '../types';
+import { Order, OrderStatus, RestaurantProfile } from '../types';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   ChefHat, 
@@ -12,7 +12,9 @@ import {
   UtensilsCrossed,
   Timer,
   ChevronRight,
-  Bell
+  Bell,
+  AlertTriangle,
+  X
 } from 'lucide-react';
 import { formatDistanceToNow } from 'date-fns';
 import { clsx, type ClassValue } from 'clsx';
@@ -24,7 +26,9 @@ function cn(...inputs: ClassValue[]) {
 
 export default function KitchenDashboard() {
   const [orders, setOrders] = useState<Order[]>([]);
+  const [restaurant, setRestaurant] = useState<RestaurantProfile | null>(null);
   const [loading, setLoading] = useState(true);
+  const [showSubPopup, setShowSubPopup] = useState(false);
 
   useEffect(() => {
     const q = query(
@@ -33,17 +37,31 @@ export default function KitchenDashboard() {
       orderBy('createdAt', 'asc')
     );
 
-    const unsubscribe = onSnapshot(q, (snapshot) => {
+    const unsubscribeOrders = onSnapshot(q, (snapshot) => {
       setOrders(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Order)));
       setLoading(false);
     }, (error) => {
       handleFirestoreError(error, OperationType.LIST, 'orders');
     });
 
-    return () => unsubscribe();
+    const unsubscribeRestaurant = onSnapshot(doc(db, 'settings', 'restaurant'), (doc) => {
+      if (doc.exists()) setRestaurant(doc.data() as RestaurantProfile);
+    });
+
+    return () => {
+      unsubscribeOrders();
+      unsubscribeRestaurant();
+    };
   }, []);
 
+  const currentEndDate = restaurant?.subscription?.endDate ? new Date(restaurant.subscription.endDate) : null;
+  const isExpired = currentEndDate && Math.ceil((currentEndDate.getTime() - new Date().getTime()) / (1000 * 3600 * 24)) <= 0;
+
   const updateStatus = async (orderId: string, status: OrderStatus) => {
+    if (isExpired && status === 'preparing') {
+      setShowSubPopup(true);
+      return;
+    }
     try {
       await updateDoc(doc(db, 'orders', orderId), { status });
     } catch (e) {
@@ -91,6 +109,33 @@ export default function KitchenDashboard() {
           </button>
         </div>
       </header>
+
+      <AnimatePresence>
+        {showSubPopup && (
+          <div className="fixed inset-0 z-[110] flex items-center justify-center p-6 bg-stone-900/80 backdrop-blur-sm">
+            <motion.div 
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.9, opacity: 0 }}
+              className="bg-stone-900 border border-stone-800 rounded-[3rem] p-10 shadow-2xl w-full max-w-lg text-center relative"
+            >
+              <button 
+                onClick={() => setShowSubPopup(false)}
+                className="absolute top-6 right-6 p-2 text-stone-500 hover:bg-stone-800 rounded-full transition-colors"
+              >
+                <X className="w-6 h-6" />
+              </button>
+              <div className="w-20 h-20 bg-red-500/10 rounded-full flex items-center justify-center mx-auto mb-6">
+                <AlertTriangle className="w-10 h-10 text-red-500" />
+              </div>
+              <h3 className="text-3xl font-serif italic text-stone-100 mb-4">Subscription Ended</h3>
+              <p className="text-stone-400 mb-8">
+                Renew your subscription to use the app. Contact your administrator.
+              </p>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
       {/* Orders Grid */}
       <main className="flex-1 p-8 overflow-y-auto">

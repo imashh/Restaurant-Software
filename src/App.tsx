@@ -11,6 +11,7 @@ import AdminDashboard from './pages/AdminDashboard';
 import KitchenDashboard from './pages/KitchenDashboard';
 import Login from './pages/Login';
 import Landing from './pages/Landing';
+import Grafiqo from './pages/Grafiqo';
 import ErrorBoundary from './components/ErrorBoundary';
 
 export default function App() {
@@ -78,6 +79,7 @@ export default function App() {
 
           {/* Staff Routes */}
           <Route path="/login" element={<Login user={user} role={role} />} />
+          <Route path="/grafiqo" element={<Grafiqo />} />
           
           <Route 
             path="/admin/*" 
