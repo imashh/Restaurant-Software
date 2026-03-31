@@ -150,7 +150,9 @@ export default function Landing({ restaurant }: Props) {
                 {order.items.map((item, idx) => (
                   <div key={idx} className="flex justify-between text-sm">
                     <span className="text-stone-600"><span className="font-bold mr-2">{item.quantity}x</span> {item.name}</span>
-                    <span className="text-stone-400">Rs. {(item.price * item.quantity).toFixed(2)}</span>
+                    <span className="text-stone-400">
+                      {typeof item.price === 'number' ? `Rs. ${(item.price * item.quantity).toFixed(2)}` : (item.price || 'N/A')}
+                    </span>
                   </div>
                 ))}
               </div>

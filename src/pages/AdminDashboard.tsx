@@ -509,9 +509,9 @@ function RecentOrders({ orders }: { orders: Order[] }) {
   const [searchTerm, setSearchTerm] = useState('');
 
   const filteredOrders = orders.filter(order => 
-    order.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    order.customerName.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    order.tableNumber.toString().includes(searchTerm)
+    (order.id || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (order.customerName || '').toLowerCase().includes(searchTerm.toLowerCase()) ||
+    (order.tableNumber || '').toString().includes(searchTerm)
   );
 
   return (
@@ -618,6 +618,12 @@ function MenuManager({ categories, menuItems }: { categories: Category[], menuIt
   const [newItem, setNewItem] = useState<Partial<MenuItem>>({ available: true });
   const [itemToDelete, setItemToDelete] = useState<string | null>(null);
   const [catToDelete, setCatToDelete] = useState<string | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+
+  const filteredItems = menuItems.filter(item => 
+    (item.name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (item.description || '').toLowerCase().includes(searchQuery.toLowerCase())
+  );
 
   const handleAddCategory = async () => {
     if (!newCatName) return;
@@ -717,16 +723,28 @@ function MenuManager({ categories, menuItems }: { categories: Category[], menuIt
       <section>
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
           <h3 className="text-2xl font-serif italic text-stone-800">Menu Items</h3>
-          <button 
-            onClick={() => setIsAddingItem(true)}
-            className="premium-button bg-primary text-white text-sm flex items-center justify-center gap-2 w-full md:w-auto"
-          >
-            <Plus className="w-4 h-4" /> Add New Dish
-          </button>
+          <div className="flex flex-col md:flex-row gap-4 w-full md:w-auto">
+            <div className="relative w-full md:w-64">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-300" />
+              <input 
+                type="text" 
+                placeholder="Search dishes..." 
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-10 pr-4 py-2 bg-white rounded-full text-sm border border-stone-100 focus:ring-2 focus:ring-primary/10" 
+              />
+            </div>
+            <button 
+              onClick={() => setIsAddingItem(true)}
+              className="premium-button bg-primary text-white text-sm flex items-center justify-center gap-2 w-full md:w-auto"
+            >
+              <Plus className="w-4 h-4" /> Add New Dish
+            </button>
+          </div>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-          {menuItems.map(item => (
+          {filteredItems.map(item => (
             <div key={item.id} className="premium-card p-6 flex gap-6">
               <div className="w-24 h-24 bg-stone-100 rounded-2xl overflow-hidden flex-shrink-0">
                 {item.imageUrl ? (
@@ -741,9 +759,13 @@ function MenuManager({ categories, menuItems }: { categories: Category[], menuIt
                 <div className="flex justify-between mb-1">
                   <h4 className="font-bold text-stone-800">{item.name}</h4>
                   <div className="flex flex-col items-end">
-                    <span className="text-primary font-bold">Rs. {item.price.toFixed(2)} {item.halfPrice ? '(Full)' : ''}</span>
+                    <span className="text-primary font-bold">
+                      {typeof item.price === 'number' ? `Rs. ${item.price.toFixed(2)}` : (item.price || 'N/A')} {item.halfPrice ? '(Full)' : ''}
+                    </span>
                     {item.halfPrice && (
-                      <span className="text-stone-500 text-sm font-medium">Rs. {item.halfPrice.toFixed(2)} (Half)</span>
+                      <span className="text-stone-500 text-sm font-medium">
+                        {typeof item.halfPrice === 'number' ? `Rs. ${item.halfPrice.toFixed(2)}` : item.halfPrice} (Half)
+                      </span>
                     )}
                   </div>
                 </div>

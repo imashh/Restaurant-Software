@@ -64,14 +64,14 @@ export default function CustomerMenu({ restaurant }: Props) {
   const filteredItems = useMemo(() => {
     return menuItems.filter(item => {
       const matchesCategory = activeCategory === 'all' || item.categoryId === activeCategory;
-      const matchesSearch = item.name.toLowerCase().includes(searchQuery.toLowerCase()) || 
-                           item.description.toLowerCase().includes(searchQuery.toLowerCase());
+      const matchesSearch = (item.name || '').toLowerCase().includes(searchQuery.toLowerCase()) || 
+                           (item.description || '').toLowerCase().includes(searchQuery.toLowerCase());
       return matchesCategory && matchesSearch;
     });
   }, [menuItems, activeCategory, searchQuery]);
 
   const cartTotal = useMemo(() => {
-    return cart.reduce((total, item) => total + (item.price * item.quantity), 0);
+    return cart.reduce((total, item) => total + ((typeof item.price === 'number' ? item.price : 0) * item.quantity), 0);
   }, [cart]);
 
   const addToCart = (item: MenuItem, isHalfPlate: boolean = false) => {
@@ -282,9 +282,13 @@ export default function CustomerMenu({ restaurant }: Props) {
                 <div className="flex justify-between items-start mb-2">
                   <h3 className="text-xl font-serif italic text-stone-800">{item.name}</h3>
                   <div className="flex flex-col items-end">
-                    <span className="text-lg font-bold text-primary">Rs. {item.price.toFixed(2)} {item.halfPrice ? '(F)' : ''}</span>
+                    <span className="text-lg font-bold text-primary">
+                      {typeof item.price === 'number' ? `Rs. ${item.price.toFixed(2)}` : (item.price || 'N/A')} {item.halfPrice ? '(F)' : ''}
+                    </span>
                     {item.halfPrice && (
-                      <span className="text-sm font-medium text-stone-500">Rs. {item.halfPrice.toFixed(2)} (H)</span>
+                      <span className="text-sm font-medium text-stone-500">
+                        {typeof item.halfPrice === 'number' ? `Rs. ${item.halfPrice.toFixed(2)}` : item.halfPrice} (H)
+                      </span>
                     )}
                   </div>
                 </div>
@@ -407,7 +411,7 @@ export default function CustomerMenu({ restaurant }: Props) {
                         <div key={`${item.id}-${item.isHalfPlate}`} className="flex items-center justify-between py-4 border-b border-stone-50">
                           <div>
                             <h4 className="font-bold text-stone-800">{item.name} {item.isHalfPlate ? '(Half)' : ''}</h4>
-                            <p className="text-stone-400 text-sm">Rs. {item.price.toFixed(2)} each</p>
+                            <p className="text-stone-400 text-sm">{typeof item.price === 'number' ? `Rs. ${item.price.toFixed(2)}` : (item.price || 'N/A')} each</p>
                           </div>
                           <div className="flex items-center gap-4">
                             <button 
