@@ -35,13 +35,13 @@ service cloud.firestore {
     function isAdmin() {
       return isAuthenticated() &&
         (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
-          (request.auth.token.email == "grafiqo.np@gmail.com" && request.auth.token.email_verified == true));
+          ((request.auth.token.email == "grafiqo.np@gmail.com" || request.auth.token.email == "bharatnepalmaitri@gmail.com") && request.auth.token.email_verified == true));
     }
 
     function isKitchen() {
       return isAuthenticated() &&
         (get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'kitchen' || 
-         (request.auth.token.email == "v.divash@gmail.com" && request.auth.token.email_verified == true) ||
+         ((request.auth.token.email == "v.divash@gmail.com" || request.auth.token.email == "dineshsonibny@gmail.com") && request.auth.token.email_verified == true) ||
          isAdmin());
     }
 

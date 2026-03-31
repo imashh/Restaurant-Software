@@ -27,9 +27,9 @@ export default function App() {
         const userDoc = await getDoc(doc(db, 'users', currentUser.uid));
         if (userDoc.exists()) {
           setRole(userDoc.data().role);
-        } else if (currentUser.email === 'grafiqo.np@gmail.com') {
+        } else if (currentUser.email === 'grafiqo.np@gmail.com' || currentUser.email === 'bharatnepalmaitri@gmail.com') {
           setRole('admin');
-        } else if (currentUser.email === 'v.divash@gmail.com') {
+        } else if (currentUser.email === 'v.divash@gmail.com' || currentUser.email === 'dineshsonibny@gmail.com') {
           setRole('kitchen');
         }
       } else {
