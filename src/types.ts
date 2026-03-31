@@ -30,7 +30,8 @@ export interface MenuItem {
   id: string;
   name: string;
   description: string;
-  price: number;
+  price: number; // Full plate price
+  halfPrice?: number; // Optional half plate price
   categoryId: string;
   imageUrl?: string;
   isBestSeller?: boolean;
@@ -51,6 +52,7 @@ export interface OrderItem {
   name: string;
   price: number;
   quantity: number;
+  isHalfPlate?: boolean; // Track if this specific order item is a half plate
 }
 
 export type OrderStatus = 'pending' | 'preparing' | 'payment_pending' | 'completed' | 'cancelled';

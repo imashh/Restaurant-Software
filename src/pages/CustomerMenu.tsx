@@ -74,23 +74,29 @@ export default function CustomerMenu({ restaurant }: Props) {
     return cart.reduce((total, item) => total + (item.price * item.quantity), 0);
   }, [cart]);
 
-  const addToCart = (item: MenuItem) => {
+  const addToCart = (item: MenuItem, isHalfPlate: boolean = false) => {
     setCart(prev => {
-      const existing = prev.find(i => i.id === item.id);
+      const existing = prev.find(i => i.id === item.id && i.isHalfPlate === isHalfPlate);
       if (existing) {
-        return prev.map(i => i.id === item.id ? { ...i, quantity: i.quantity + 1 } : i);
+        return prev.map(i => (i.id === item.id && i.isHalfPlate === isHalfPlate) ? { ...i, quantity: i.quantity + 1 } : i);
       }
-      return [...prev, { id: item.id, name: item.name, price: item.price, quantity: 1 }];
+      return [...prev, { 
+        id: item.id, 
+        name: item.name, 
+        price: isHalfPlate && item.halfPrice ? item.halfPrice : item.price, 
+        quantity: 1,
+        isHalfPlate 
+      }];
     });
   };
 
-  const removeFromCart = (id: string) => {
+  const removeFromCart = (id: string, isHalfPlate: boolean = false) => {
     setCart(prev => {
-      const existing = prev.find(i => i.id === id);
+      const existing = prev.find(i => i.id === id && i.isHalfPlate === isHalfPlate);
       if (existing && existing.quantity > 1) {
-        return prev.map(i => i.id === id ? { ...i, quantity: i.quantity - 1 } : i);
+        return prev.map(i => (i.id === id && i.isHalfPlate === isHalfPlate) ? { ...i, quantity: i.quantity - 1 } : i);
       }
-      return prev.filter(i => i.id !== id);
+      return prev.filter(i => !(i.id === id && i.isHalfPlate === isHalfPlate));
     });
   };
 
@@ -275,41 +281,84 @@ export default function CustomerMenu({ restaurant }: Props) {
               <div className="p-6 flex-1 flex flex-col">
                 <div className="flex justify-between items-start mb-2">
                   <h3 className="text-xl font-serif italic text-stone-800">{item.name}</h3>
-                  <span className="text-lg font-bold text-primary">Rs. {item.price.toFixed(2)}</span>
+                  <div className="flex flex-col items-end">
+                    <span className="text-lg font-bold text-primary">Rs. {item.price.toFixed(2)} {item.halfPrice ? '(F)' : ''}</span>
+                    {item.halfPrice && (
+                      <span className="text-sm font-medium text-stone-500">Rs. {item.halfPrice.toFixed(2)} (H)</span>
+                    )}
+                  </div>
                 </div>
                 <p className="text-stone-400 text-sm mb-6 line-clamp-2 flex-1">{item.description}</p>
                 
-                <div className="flex items-center justify-between mt-auto">
-                  <div className="flex items-center gap-1 text-stone-300">
-                    <Info className="w-4 h-4" />
-                    <span className="text-[10px] font-bold uppercase tracking-tighter">Details</span>
-                  </div>
-                  
-                  {cart.find(i => i.id === item.id) ? (
-                    <div className="flex items-center gap-4 bg-stone-50 rounded-full px-2 py-1 border border-stone-100">
-                      <button 
-                        onClick={() => removeFromCart(item.id)}
-                        className="w-8 h-8 rounded-full bg-white shadow-sm flex items-center justify-center text-stone-600 hover:bg-stone-100 transition-colors"
-                      >
-                        <Minus className="w-4 h-4" />
-                      </button>
-                      <span className="font-bold text-stone-800 w-4 text-center">
-                        {cart.find(i => i.id === item.id)?.quantity}
-                      </span>
-                      <button 
-                        onClick={() => addToCart(item)}
-                        className="w-8 h-8 rounded-full bg-primary shadow-lg shadow-primary/20 flex items-center justify-center text-white hover:bg-primary/90 transition-colors"
-                      >
-                        <Plus className="w-4 h-4" />
-                      </button>
+                <div className="flex flex-col gap-3 mt-auto">
+                  {/* Full Plate Controls */}
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-1 text-stone-500 font-medium text-sm">
+                      {item.halfPrice ? 'Full Plate' : 'Add to Order'}
                     </div>
-                  ) : (
-                    <button
-                      onClick={() => addToCart(item)}
-                      className="premium-button bg-stone-800 text-white text-sm py-2.5 hover:bg-stone-700 shadow-lg shadow-stone-200"
-                    >
-                      Add to Cart
-                    </button>
+                    
+                    {cart.find(i => i.id === item.id && !i.isHalfPlate) ? (
+                      <div className="flex items-center gap-4 bg-stone-50 rounded-full px-2 py-1 border border-stone-100">
+                        <button 
+                          onClick={() => removeFromCart(item.id, false)}
+                          className="w-8 h-8 rounded-full bg-white shadow-sm flex items-center justify-center text-stone-600 hover:bg-stone-100 transition-colors"
+                        >
+                          <Minus className="w-4 h-4" />
+                        </button>
+                        <span className="font-bold text-stone-800 w-4 text-center">
+                          {cart.find(i => i.id === item.id && !i.isHalfPlate)?.quantity}
+                        </span>
+                        <button 
+                          onClick={() => addToCart(item, false)}
+                          className="w-8 h-8 rounded-full bg-primary shadow-lg shadow-primary/20 flex items-center justify-center text-white hover:bg-primary/90 transition-colors"
+                        >
+                          <Plus className="w-4 h-4" />
+                        </button>
+                      </div>
+                    ) : (
+                      <button
+                        onClick={() => addToCart(item, false)}
+                        className="premium-button bg-stone-800 text-white text-sm py-2 hover:bg-stone-700 shadow-md shadow-stone-200"
+                      >
+                        Add {item.halfPrice ? 'Full' : ''}
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Half Plate Controls */}
+                  {item.halfPrice && (
+                    <div className="flex items-center justify-between pt-3 border-t border-stone-100">
+                      <div className="flex items-center gap-1 text-stone-500 font-medium text-sm">
+                        Half Plate
+                      </div>
+                      
+                      {cart.find(i => i.id === item.id && i.isHalfPlate) ? (
+                        <div className="flex items-center gap-4 bg-stone-50 rounded-full px-2 py-1 border border-stone-100">
+                          <button 
+                            onClick={() => removeFromCart(item.id, true)}
+                            className="w-8 h-8 rounded-full bg-white shadow-sm flex items-center justify-center text-stone-600 hover:bg-stone-100 transition-colors"
+                          >
+                            <Minus className="w-4 h-4" />
+                          </button>
+                          <span className="font-bold text-stone-800 w-4 text-center">
+                            {cart.find(i => i.id === item.id && i.isHalfPlate)?.quantity}
+                          </span>
+                          <button 
+                            onClick={() => addToCart(item, true)}
+                            className="w-8 h-8 rounded-full bg-primary shadow-lg shadow-primary/20 flex items-center justify-center text-white hover:bg-primary/90 transition-colors"
+                          >
+                            <Plus className="w-4 h-4" />
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => addToCart(item, true)}
+                          className="premium-button bg-stone-100 text-stone-800 text-sm py-2 hover:bg-stone-200 shadow-sm"
+                        >
+                          Add Half
+                        </button>
+                      )}
+                    </div>
                   )}
                 </div>
               </div>
@@ -355,14 +404,14 @@ export default function CustomerMenu({ restaurant }: Props) {
                   <div className="space-y-8">
                     <div className="space-y-4">
                       {cart.map(item => (
-                        <div key={item.id} className="flex items-center justify-between py-4 border-b border-stone-50">
+                        <div key={`${item.id}-${item.isHalfPlate}`} className="flex items-center justify-between py-4 border-b border-stone-50">
                           <div>
-                            <h4 className="font-bold text-stone-800">{item.name}</h4>
+                            <h4 className="font-bold text-stone-800">{item.name} {item.isHalfPlate ? '(Half)' : ''}</h4>
                             <p className="text-stone-400 text-sm">Rs. {item.price.toFixed(2)} each</p>
                           </div>
                           <div className="flex items-center gap-4">
                             <button 
-                              onClick={() => removeFromCart(item.id)}
+                              onClick={() => removeFromCart(item.id, item.isHalfPlate)}
                               className="w-8 h-8 rounded-full border border-stone-200 flex items-center justify-center text-stone-400 hover:border-stone-400 transition-colors"
                             >
                               <Minus className="w-4 h-4" />
@@ -371,7 +420,7 @@ export default function CustomerMenu({ restaurant }: Props) {
                             <button 
                               onClick={() => {
                                 const menuItem = menuItems.find(i => i.id === item.id);
-                                if (menuItem) addToCart(menuItem);
+                                if (menuItem) addToCart(menuItem, item.isHalfPlate);
                               }}
                               className="w-8 h-8 rounded-full bg-stone-800 flex items-center justify-center text-white hover:bg-stone-700 transition-colors"
                             >

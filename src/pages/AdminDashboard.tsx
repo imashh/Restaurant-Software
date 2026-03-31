@@ -559,7 +559,7 @@ function RecentOrders({ orders }: { orders: Order[] }) {
                   <td className="py-6">
                     <div className="flex flex-col gap-1">
                       {order.items.map((item, idx) => (
-                        <span key={idx} className="text-xs text-stone-500">{item.quantity}x {item.name}</span>
+                        <span key={idx} className="text-xs text-stone-500">{item.quantity}x {item.name} {item.isHalfPlate ? '(Half)' : ''}</span>
                       ))}
                     </div>
                   </td>
@@ -740,7 +740,12 @@ function MenuManager({ categories, menuItems }: { categories: Category[], menuIt
               <div className="flex-1">
                 <div className="flex justify-between mb-1">
                   <h4 className="font-bold text-stone-800">{item.name}</h4>
-                  <span className="text-primary font-bold">Rs. {item.price.toFixed(2)}</span>
+                  <div className="flex flex-col items-end">
+                    <span className="text-primary font-bold">Rs. {item.price.toFixed(2)} {item.halfPrice ? '(Full)' : ''}</span>
+                    {item.halfPrice && (
+                      <span className="text-stone-500 text-sm font-medium">Rs. {item.halfPrice.toFixed(2)} (Half)</span>
+                    )}
+                  </div>
                 </div>
                 <p className="text-stone-400 text-xs mb-4 line-clamp-2">{item.description}</p>
                 <div className="flex items-center justify-between">
@@ -821,8 +826,12 @@ function MenuManager({ categories, menuItems }: { categories: Category[], menuIt
                   <input type="text" className="premium-input" onChange={e => setNewItem({...newItem, name: e.target.value})} />
                 </div>
                 <div>
-                  <label className="text-xs font-bold text-stone-400 uppercase tracking-widest mb-2 block">Price</label>
+                  <label className="text-xs font-bold text-stone-400 uppercase tracking-widest mb-2 block">Full Plate Price (Rs.)</label>
                   <input type="number" className="premium-input" onChange={e => setNewItem({...newItem, price: parseFloat(e.target.value)})} />
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-stone-400 uppercase tracking-widest mb-2 block">Half Plate Price (Rs.) - Optional</label>
+                  <input type="number" className="premium-input" placeholder="Leave empty if not applicable" onChange={e => setNewItem({...newItem, halfPrice: e.target.value ? parseFloat(e.target.value) : undefined})} />
                 </div>
                 <div>
                   <label className="text-xs font-bold text-stone-400 uppercase tracking-widest mb-2 block">Category</label>
@@ -862,8 +871,12 @@ function MenuManager({ categories, menuItems }: { categories: Category[], menuIt
                   <input type="text" className="premium-input" value={editingItem.name} onChange={e => setEditingItem({...editingItem, name: e.target.value})} />
                 </div>
                 <div>
-                  <label className="text-xs font-bold text-stone-400 uppercase tracking-widest mb-2 block">Price</label>
+                  <label className="text-xs font-bold text-stone-400 uppercase tracking-widest mb-2 block">Full Plate Price (Rs.)</label>
                   <input type="number" className="premium-input" value={editingItem.price} onChange={e => setEditingItem({...editingItem, price: parseFloat(e.target.value)})} />
+                </div>
+                <div>
+                  <label className="text-xs font-bold text-stone-400 uppercase tracking-widest mb-2 block">Half Plate Price (Rs.) - Optional</label>
+                  <input type="number" className="premium-input" value={editingItem.halfPrice || ''} placeholder="Leave empty if not applicable" onChange={e => setEditingItem({...editingItem, halfPrice: e.target.value ? parseFloat(e.target.value) : undefined})} />
                 </div>
                 <div>
                   <label className="text-xs font-bold text-stone-400 uppercase tracking-widest mb-2 block">Category</label>

@@ -190,7 +190,7 @@ export default function KitchenDashboard() {
                               {item.quantity}
                             </span>
                             <span className="text-stone-200 font-medium group-hover:text-white transition-colors text-sm md:text-base">
-                              {item.name}
+                              {item.name} {item.isHalfPlate ? <span className="text-stone-500 text-xs ml-1">(Half)</span> : ''}
                             </span>
                           </div>
                         </div>
