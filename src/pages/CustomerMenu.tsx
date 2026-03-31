@@ -71,7 +71,10 @@ export default function CustomerMenu({ restaurant }: Props) {
   }, [menuItems, activeCategory, searchQuery]);
 
   const cartTotal = useMemo(() => {
-    return cart.reduce((total, item) => total + ((typeof item.price === 'number' ? item.price : 0) * item.quantity), 0);
+    return cart.reduce((total, item) => {
+      const price = item.isHalfPlate && item.halfPrice ? item.halfPrice : item.price;
+      return total + ((typeof price === 'number' ? price : 0) * item.quantity);
+    }, 0);
   }, [cart]);
 
   const addToCart = (item: MenuItem, isHalfPlate: boolean = false) => {
@@ -138,8 +141,8 @@ export default function CustomerMenu({ restaurant }: Props) {
           <div className="w-24 h-24 bg-green-500 rounded-full mx-auto mb-8 flex items-center justify-center shadow-lg shadow-green-200">
             <CheckCircle2 className="w-12 h-12 text-white" />
           </div>
-          <h1 className="text-4xl font-serif italic text-stone-900 mb-4">Order Placed!</h1>
-          <p className="text-stone-500 mb-10 text-lg font-medium">
+          <h1 className="text-3xl md:text-4xl font-serif italic text-stone-900 mb-4">Order Placed!</h1>
+          <p className="text-stone-500 mb-10 text-base md:text-lg font-medium">
             Your order has been sent to the kitchen. We'll serve you shortly.
           </p>
           <div className="space-y-4">
@@ -169,8 +172,8 @@ export default function CustomerMenu({ restaurant }: Props) {
           <ChevronLeft className="w-6 h-6 text-stone-600" />
         </button>
         <div className="text-center">
-          <h1 className="text-xl font-serif italic text-stone-900">{restaurant?.name || 'Menu'}</h1>
-          <p className="text-[10px] text-stone-400 uppercase tracking-widest font-bold">Table {tableId}</p>
+          <h1 className="text-lg md:text-xl font-serif italic text-stone-900">{restaurant?.name || 'Menu'}</h1>
+          <p className="text-[10px] md:text-xs text-stone-400 uppercase tracking-widest font-bold">Table {tableId}</p>
         </div>
         <button 
           onClick={() => setIsCartOpen(true)}
@@ -280,9 +283,9 @@ export default function CustomerMenu({ restaurant }: Props) {
 
               <div className="p-6 flex-1 flex flex-col">
                 <div className="flex justify-between items-start mb-2">
-                  <h3 className="text-xl font-serif italic text-stone-800">{item.name}</h3>
+                  <h3 className="text-lg md:text-xl font-serif italic text-stone-800">{item.name}</h3>
                   <div className="flex flex-col items-end">
-                    <span className="text-lg font-bold text-primary">
+                    <span className="text-base md:text-lg font-bold text-primary">
                       {typeof item.price === 'number' ? `Rs. ${item.price.toFixed(2)}` : (item.price || 'N/A')} {item.halfPrice ? '(F)' : ''}
                     </span>
                     {item.halfPrice && (
@@ -389,9 +392,9 @@ export default function CustomerMenu({ restaurant }: Props) {
               transition={{ type: 'spring', damping: 25, stiffness: 200 }}
               className="fixed bottom-0 left-0 right-0 bg-white rounded-t-[3rem] z-50 max-h-[90vh] overflow-y-auto shadow-2xl border-t border-stone-100"
             >
-              <div className="p-8">
+              <div className="p-6 md:p-8">
                 <div className="flex items-center justify-between mb-8">
-                  <h2 className="text-3xl font-serif italic text-stone-900">Your Order</h2>
+                  <h2 className="text-2xl md:text-3xl font-serif italic text-stone-900">Your Order</h2>
                   <button onClick={() => setIsCartOpen(false)} className="p-2 hover:bg-stone-50 rounded-full">
                     <X className="w-6 h-6 text-stone-400" />
                   </button>
@@ -411,7 +414,11 @@ export default function CustomerMenu({ restaurant }: Props) {
                         <div key={`${item.id}-${item.isHalfPlate}`} className="flex items-center justify-between py-4 border-b border-stone-50">
                           <div>
                             <h4 className="font-bold text-stone-800">{item.name} {item.isHalfPlate ? '(Half)' : ''}</h4>
-                            <p className="text-stone-400 text-sm">{typeof item.price === 'number' ? `Rs. ${item.price.toFixed(2)}` : (item.price || 'N/A')} each</p>
+                            <p className="text-stone-400 text-sm">
+                              {typeof (item.isHalfPlate && item.halfPrice ? item.halfPrice : item.price) === 'number' 
+                                ? `Rs. ${(item.isHalfPlate && item.halfPrice ? item.halfPrice : item.price).toFixed(2)}` 
+                                : ((item.isHalfPlate && item.halfPrice ? item.halfPrice : item.price) || 'N/A')} each
+                            </p>
                           </div>
                           <div className="flex items-center gap-4">
                             <button 
@@ -459,13 +466,13 @@ export default function CustomerMenu({ restaurant }: Props) {
 
                     <div className="pt-6 border-t border-stone-100">
                       <div className="flex justify-between items-center mb-8">
-                        <span className="text-stone-400 font-medium">Total Amount</span>
-                        <span className="text-3xl font-serif italic text-primary">Rs. {cartTotal.toFixed(2)}</span>
+                        <span className="text-stone-400 font-medium text-sm md:text-base">Total Amount</span>
+                        <span className="text-2xl md:text-3xl font-serif italic text-primary">Rs. {cartTotal.toFixed(2)}</span>
                       </div>
                       <button
                         onClick={handlePlaceOrder}
                         disabled={!customerName || cart.length === 0 || isOrdering}
-                        className="w-full premium-button bg-primary text-white py-5 text-xl font-serif italic shadow-2xl shadow-primary/20 disabled:opacity-50"
+                        className="w-full premium-button bg-primary text-white py-4 md:py-5 text-lg md:text-xl font-serif italic shadow-2xl shadow-primary/20 disabled:opacity-50"
                       >
                         {isOrdering ? 'Placing Order...' : 'Confirm Order'}
                       </button>

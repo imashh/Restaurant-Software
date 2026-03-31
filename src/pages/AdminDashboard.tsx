@@ -10,7 +10,8 @@ import {
   updateDoc, 
   query, 
   orderBy,
-  getDocs
+  getDocs,
+  deleteField
 } from 'firebase/firestore';
 import { 
   RestaurantProfile, 
@@ -36,20 +37,23 @@ import {
   Palette,
   QrCode,
   ChevronRight,
+  ChevronLeft,
+  Calendar,
   Search,
   Banknote,
   TrendingUp,
   AlertTriangle,
   Shield,
   Menu,
-  X as XIcon
+  X as XIcon,
+  Download
 } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { QRCodeSVG } from 'qrcode.react';
-import { format, startOfDay, startOfWeek, startOfMonth, isAfter } from 'date-fns';
+import { QRCodeCanvas } from 'qrcode.react';
+import { format, startOfDay, startOfWeek, startOfMonth, isAfter, endOfMonth, isSameMonth, getDate, getDaysInMonth, subDays, isSameDay, addMonths, subMonths } from 'date-fns';
 import { clsx, type ClassValue } from 'clsx';
 import { twMerge } from 'tailwind-merge';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line, ReferenceLine } from 'recharts';
 
 function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
@@ -351,6 +355,8 @@ function SidebarItem({ icon, label, active, onClick }: { icon: any, label: strin
 
 function Overview({ orders, restaurant }: { orders: Order[], restaurant: RestaurantProfile | null }) {
   const [showSubPopup, setShowSubPopup] = useState(false);
+  const [selectedMonthStr, setSelectedMonthStr] = useState<string>(format(new Date(), 'yyyy-MM'));
+  
   const activeOrders = orders.filter(o => o.status !== 'completed' && o.status !== 'cancelled');
   const completedOrders = orders.filter(o => o.status === 'completed');
   
@@ -365,6 +371,49 @@ function Overview({ orders, restaurant }: { orders: Order[], restaurant: Restaur
   const revenueToday = completedToday.reduce((sum, o) => sum + o.total, 0);
   const revenueThisWeek = completedThisWeek.reduce((sum, o) => sum + o.total, 0);
   const revenueThisMonth = completedThisMonth.reduce((sum, o) => sum + o.total, 0);
+
+  // Selected Month calculations
+  const selectedMonthDate = new Date(`${selectedMonthStr}-01T00:00:00`);
+  const monthStart = startOfMonth(selectedMonthDate);
+  const monthEnd = endOfMonth(selectedMonthDate);
+  
+  const completedInSelectedMonth = completedOrders.filter(o => {
+    const d = new Date(o.createdAt);
+    return d >= monthStart && d <= monthEnd;
+  });
+
+  const revenueInSelectedMonth = completedInSelectedMonth.reduce((sum, o) => sum + o.total, 0);
+
+  const itemCountsMonth: Record<string, number> = {};
+  completedInSelectedMonth.forEach(order => {
+    order.items.forEach(item => {
+      itemCountsMonth[item.name] = (itemCountsMonth[item.name] || 0) + item.quantity;
+    });
+  });
+
+  const sortedItemsMonth = Object.entries(itemCountsMonth)
+    .sort(([, a], [, b]) => b - a)
+    .slice(0, 4)
+    .map(([name, count]) => ({ name, count }));
+
+  const mostSoldItemMonth = sortedItemsMonth.length > 0 ? sortedItemsMonth[0].name : 'N/A';
+
+  // Average daily sales for selected month
+  let daysForAvg = 1;
+  if (isSameMonth(selectedMonthDate, new Date())) {
+    daysForAvg = Math.max(1, getDate(new Date()));
+  } else if (selectedMonthDate < new Date()) {
+    daysForAvg = getDaysInMonth(selectedMonthDate);
+  }
+  const averageDailySalesMonth = revenueInSelectedMonth / daysForAvg;
+
+  // Last 7 days trend
+  const last7DaysData = Array.from({ length: 7 }).map((_, i) => {
+    const d = subDays(new Date(), 6 - i);
+    const dayOrders = completedOrders.filter(o => isSameDay(new Date(o.createdAt), d));
+    const sales = dayOrders.reduce((sum, o) => sum + o.total, 0);
+    return { name: format(d, 'EEE'), sales };
+  });
 
   // Calculate average daily sales based on the first order date
   const firstOrderDate = completedOrders.length > 0 
@@ -412,6 +461,38 @@ function Overview({ orders, restaurant }: { orders: Order[], restaurant: Restaur
       animate={{ opacity: 1, y: 0 }}
       className="space-y-8"
     >
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <h2 className="text-2xl md:text-3xl font-serif italic text-stone-800">Overview</h2>
+        <div className="flex items-center gap-1 bg-white p-1.5 rounded-2xl shadow-sm border border-stone-100">
+          <button 
+            onClick={() => setSelectedMonthStr(format(subMonths(selectedMonthDate, 1), 'yyyy-MM'))}
+            className="p-2 hover:bg-stone-50 rounded-xl transition-colors text-stone-400 hover:text-stone-800"
+          >
+            <ChevronLeft className="w-4 h-4" />
+          </button>
+          
+          <div className="relative flex items-center justify-center min-w-[140px]">
+            <Calendar className="absolute left-2 w-4 h-4 text-stone-300 pointer-events-none" />
+            <span className="text-sm font-bold text-stone-800 tracking-wide pl-8 pr-2">
+              {format(selectedMonthDate, 'MMMM yyyy')}
+            </span>
+            <input 
+              type="month" 
+              value={selectedMonthStr}
+              onChange={(e) => setSelectedMonthStr(e.target.value)}
+              className="absolute inset-0 opacity-0 cursor-pointer w-full"
+            />
+          </div>
+
+          <button 
+            onClick={() => setSelectedMonthStr(format(addMonths(selectedMonthDate, 1), 'yyyy-MM'))}
+            className="p-2 hover:bg-stone-50 rounded-xl transition-colors text-stone-400 hover:text-stone-800"
+          >
+            <ChevronRight className="w-4 h-4" />
+          </button>
+        </div>
+      </div>
+
       <AnimatePresence>
         {showSubPopup && (
           <div className="fixed inset-0 z-[110] flex items-center justify-center p-6 bg-stone-900/40 backdrop-blur-sm">
@@ -438,40 +519,55 @@ function Overview({ orders, restaurant }: { orders: Order[], restaurant: Restaur
           </div>
         )}
       </AnimatePresence>
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
         <StatCard label="Active Orders" value={activeOrders.length} icon={<Clock className="text-amber-500" />} />
         <StatCard label="Pending Payment" value={pendingPaymentOrders.length} icon={<AlertTriangle className="text-orange-500" />} />
-        <StatCard label="Completed Today" value={completedToday.length} icon={<CheckCircle2 className="text-green-500" />} />
-        <StatCard label="Most Sold Item" value={mostSoldItem} icon={<Utensils className="text-blue-500" />} />
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-        <StatCard label="Daily Revenue" value={`Rs. ${revenueToday.toFixed(2)}`} icon={<Banknote className="text-primary" />} />
-        <StatCard label="Weekly Revenue" value={`Rs. ${revenueThisWeek.toFixed(2)}`} icon={<TrendingUp className="text-primary" />} />
-        <StatCard label="Monthly Revenue" value={`Rs. ${revenueThisMonth.toFixed(2)}`} icon={<Palette className="text-primary" />} />
-        <StatCard label="Avg Daily Sales" value={`Rs. ${averageDailySales.toFixed(2)}`} icon={<TrendingUp className="text-blue-500" />} />
+        <StatCard label="Completed (Today)" value={completedToday.length} icon={<CheckCircle2 className="text-green-500" />} />
+        <StatCard label="Today Sales" value={`Rs. ${revenueToday.toFixed(2)}`} icon={<Banknote className="text-primary" />} />
+        <StatCard label={`This month Sales (${format(selectedMonthDate, 'MMM')})`} value={`Rs. ${revenueInSelectedMonth.toFixed(2)}`} icon={<Palette className="text-primary" />} />
+        <StatCard label={`Avg. Daily Sales (${format(selectedMonthDate, 'MMM')})`} value={`Rs. ${averageDailySalesMonth.toFixed(2)}`} icon={<TrendingUp className="text-blue-500" />} />
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <div className="lg:col-span-2 premium-card p-4 md:p-8">
-          <h3 className="text-xl font-serif italic text-stone-800 mb-6">Top Selling Items</h3>
-          <div className="h-[300px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={sortedItems} layout="vertical" margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
-                <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f5f5f4" />
-                <XAxis type="number" hide />
-                <YAxis dataKey="name" type="category" axisLine={false} tickLine={false} tick={{ fill: '#78716c', fontSize: 12 }} width={120} />
-                <Tooltip 
-                  cursor={{ fill: '#fafaf9' }}
-                  contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1)' }}
-                />
-                <Bar dataKey="count" fill="var(--primary)" radius={[0, 4, 4, 0]} barSize={32} />
-              </BarChart>
-            </ResponsiveContainer>
+        <div className="lg:col-span-2 space-y-8">
+          <div className="premium-card p-4 md:p-8">
+            <h3 className="text-xl font-serif italic text-stone-800 mb-6">Sales Trend vs Average</h3>
+            <div className="h-[300px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={last7DaysData} margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f5f5f4" />
+                  <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#78716c', fontSize: 12 }} />
+                  <YAxis axisLine={false} tickLine={false} tick={{ fill: '#78716c', fontSize: 12 }} />
+                  <Tooltip 
+                    contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1)' }}
+                  />
+                  <ReferenceLine y={averageDailySalesMonth} label={{ position: 'top', value: 'Avg Daily', fill: '#f97316', fontSize: 12 }} stroke="#f97316" strokeDasharray="3 3" />
+                  <Line type="monotone" dataKey="sales" name="Sales" stroke="var(--primary)" strokeWidth={3} dot={{ r: 4, fill: "var(--primary)", strokeWidth: 2, stroke: "#fff" }} activeDot={{ r: 6 }} />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+
+          <div className="premium-card p-4 md:p-8">
+            <h3 className="text-xl font-serif italic text-stone-800 mb-6">Top Selling Items ({format(selectedMonthDate, 'MMMM yyyy')})</h3>
+            <div className="h-[300px]">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={sortedItemsMonth} layout="vertical" margin={{ top: 5, right: 30, left: 20, bottom: 5 }}>
+                  <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#f5f5f4" />
+                  <XAxis type="number" hide />
+                  <YAxis dataKey="name" type="category" axisLine={false} tickLine={false} tick={{ fill: '#78716c', fontSize: 12 }} width={120} />
+                  <Tooltip 
+                    cursor={{ fill: '#fafaf9' }}
+                    contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.1)' }}
+                  />
+                  <Bar dataKey="count" fill="var(--primary)" radius={[0, 4, 4, 0]} barSize={32} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
           </div>
         </div>
 
-        <div className="premium-card p-4 md:p-8 flex flex-col">
+        <div className="premium-card p-4 md:p-8 flex flex-col h-[750px]">
           <h3 className="text-xl font-serif italic text-stone-800 mb-6">Pending Payments</h3>
           <div className="flex-1 overflow-y-auto space-y-4 pr-2">
             {pendingPaymentOrders.length === 0 ? (
@@ -521,7 +617,7 @@ function RecentOrders({ orders }: { orders: Order[] }) {
       className="premium-card p-4 md:p-8"
     >
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
-        <h3 className="text-2xl font-serif italic text-stone-800">Recent Orders</h3>
+        <h3 className="text-2xl md:text-3xl font-serif italic text-stone-800">Recent Orders</h3>
         <div className="relative w-full md:w-auto">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-300" />
           <input 
@@ -645,7 +741,11 @@ function MenuManager({ categories, menuItems }: { categories: Category[], menuIt
   const handleAddItem = async () => {
     if (!newItem.name || !newItem.price || !newItem.categoryId) return;
     try {
-      await addDoc(collection(db, 'menuItems'), { ...newItem, available: true });
+      const dataToAdd: any = { ...newItem, available: true };
+      if (dataToAdd.halfPrice === undefined) {
+        delete dataToAdd.halfPrice;
+      }
+      await addDoc(collection(db, 'menuItems'), dataToAdd);
       setNewItem({ available: true });
       setIsAddingItem(false);
     } catch (e) { handleFirestoreError(e, OperationType.CREATE, 'menuItems'); }
@@ -655,7 +755,11 @@ function MenuManager({ categories, menuItems }: { categories: Category[], menuIt
     if (!editingItem || !editingItem.name || !editingItem.price || !editingItem.categoryId) return;
     try {
       const { id, ...data } = editingItem;
-      await updateDoc(doc(db, 'menuItems', id), data);
+      const dataToUpdate: any = { ...data };
+      if (dataToUpdate.halfPrice === undefined) {
+        dataToUpdate.halfPrice = deleteField();
+      }
+      await updateDoc(doc(db, 'menuItems', id), dataToUpdate);
       setEditingItem(null);
     } catch (e) { handleFirestoreError(e, OperationType.UPDATE, 'menuItems'); }
   };
@@ -687,7 +791,7 @@ function MenuManager({ categories, menuItems }: { categories: Category[], menuIt
       {/* Categories */}
       <section>
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
-          <h3 className="text-2xl font-serif italic text-stone-800">Categories</h3>
+          <h3 className="text-2xl md:text-3xl font-serif italic text-stone-800">Categories</h3>
           <button 
             onClick={() => setIsAddingCat(true)}
             className="premium-button bg-stone-800 text-white text-sm flex items-center justify-center gap-2 w-full md:w-auto"
@@ -722,7 +826,7 @@ function MenuManager({ categories, menuItems }: { categories: Category[], menuIt
       {/* Menu Items */}
       <section>
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
-          <h3 className="text-2xl font-serif italic text-stone-800">Menu Items</h3>
+          <h3 className="text-2xl md:text-3xl font-serif italic text-stone-800">Menu Items</h3>
           <div className="flex flex-col md:flex-row gap-4 w-full md:w-auto">
             <div className="relative w-full md:w-64">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-stone-300" />
@@ -985,9 +1089,12 @@ function TableManager({ tables }: { tables: Table[] }) {
       className="space-y-12"
     >
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
-        <h3 className="text-2xl font-serif italic text-stone-800">Tables & QR Codes</h3>
+        <h3 className="text-2xl md:text-3xl font-serif italic text-stone-800">Tables & QR Codes</h3>
         <button 
-          onClick={() => setIsAdding(true)}
+          onClick={() => {
+            setNewTableNum(tables.length > 0 ? Math.max(...tables.map(t => t.number)) + 1 : 1);
+            setIsAdding(true);
+          }}
           className="premium-button bg-stone-800 text-white text-sm flex items-center justify-center gap-2 w-full md:w-auto"
         >
           <Plus className="w-4 h-4" /> Add Table
@@ -1002,7 +1109,8 @@ function TableManager({ tables }: { tables: Table[] }) {
             </div>
             
             <div className="bg-white p-4 rounded-3xl shadow-inner border border-stone-50 mb-6">
-              <QRCodeSVG 
+              <QRCodeCanvas 
+                id={`qr-table-${table.number}`}
                 value={`${window.location.origin}/table/${table.number}`} 
                 size={120}
                 level="H"
@@ -1013,8 +1121,20 @@ function TableManager({ tables }: { tables: Table[] }) {
             <p className="text-xs text-stone-400 font-bold uppercase tracking-widest mb-6">Scan for Table {table.number}</p>
             
             <div className="flex items-center gap-2 w-full">
-              <button className="flex-1 premium-button bg-stone-50 text-stone-600 text-xs py-2 hover:bg-stone-100 flex items-center justify-center gap-2">
-                <QrCode className="w-3 h-3" /> Print
+              <button 
+                onClick={() => {
+                  const canvas = document.getElementById(`qr-table-${table.number}`) as HTMLCanvasElement;
+                  if (canvas) {
+                    const url = canvas.toDataURL("image/png");
+                    const a = document.createElement("a");
+                    a.href = url;
+                    a.download = `table-${table.number}-qr.png`;
+                    a.click();
+                  }
+                }}
+                className="flex-1 premium-button bg-stone-50 text-stone-600 text-xs py-2 hover:bg-stone-100 flex items-center justify-center gap-2"
+              >
+                <Download className="w-3 h-3" /> Download
               </button>
               <button 
                 onClick={() => setEditingTable(table)}
